@@ -7,11 +7,14 @@ if: tag IS blank
 
 jobs:
   include:
-    - stage: test
+    - name: Unit Tests
+      stage: test
       script: make test verbose=true
+    - name: E2E Tests
+      stage: test
+      script: make functional
+      services:
+        - docker
     - stage: tag
       script: make tag
       if: branch = master AND type = push
-
-script:
-- make travis verbose=true

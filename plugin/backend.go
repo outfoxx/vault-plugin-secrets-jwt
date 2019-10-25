@@ -155,7 +155,7 @@ func (b *backend) GetPublicKeys() *jose.JSONWebKeySet {
 	}
 
 	for i, k := range b.keys {
-		jwks.Keys[i].Key = k.Key.PublicKey
+		jwks.Keys[i].Key = &k.Key.PublicKey
 		jwks.Keys[i].KeyID = k.ID
 		jwks.Keys[i].Algorithm = "RS256"
 		jwks.Keys[i].Use = "sig"
