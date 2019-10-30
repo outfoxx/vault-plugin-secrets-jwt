@@ -14,7 +14,7 @@ func TestSign(t *testing.T) {
 
 	data := map[string]interface{}{
 		"claims": map[string]interface{}{
-			"bar": "baz",
+			"aud": "Zapp Brannigan",
 		},
 	}
 
@@ -32,25 +32,53 @@ func TestSign(t *testing.T) {
 
 	rawToken, ok := resp.Data["token"]
 	if !ok {
-		t.Fatalf("No returned token.")
+		t.Fatalf("No returned token.\n")
 	}
 
 	strToken, ok := rawToken.(string)
 	if !ok {
-		t.Fatalf("Token was not a string")
+		t.Fatalf("Token was %T, not a string\n", rawToken)
 	}
 
 	token, err := jwt.ParseSigned(strToken)
 	if err != nil {
-		t.Fatalf("error parsing jwt: %s", err)
+		t.Fatalf("error parsing jwt: %s\n", err)
 	}
 
-	claims := make(map[string]interface{})
+	var claims jwt.Claims
 	if err = token.Claims(b.keys[0].Key.Public(), &claims); err != nil {
-		t.Fatalf("error decoding claims: %s", err)
+		t.Fatalf("error decoding claims: %s\n", err)
 	}
 
-	if diff := deep.Equal(data["claims"], claims); diff != nil {
+	expectedExpiry := jwt.NumericDate(5 * 60)
+	expectedClaims := jwt.Claims{
+		Audience: []string{"Zapp Brannigan"},
+		Expiry:   &expectedExpiry,
+	}
+
+	if diff := deep.Equal(expectedClaims, claims); diff != nil {
 		t.Error(diff)
+	}
+}
+
+func TestRejectReservedClaims(t *testing.T) {
+	b, storage := getTestBackend(t)
+
+	data := map[string]interface{}{
+		"claims": map[string]interface{}{
+			"exp": 1234,
+		},
+	}
+
+	req := &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "sign",
+		Storage:   storage,
+		Data:      data,
+	}
+
+	resp, err := b.HandleRequest(context.Background(), req)
+	if err == nil && (resp != nil && !resp.IsError()) {
+		t.Fatalf("expected to get an error from sign. got:%v\n", resp)
 	}
 }

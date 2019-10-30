@@ -13,9 +13,27 @@ vault login root
 vault plugin register -sha256 $SHASUM vault-plugin-secrets-jwt
 vault secrets enable -path=jwt vault-plugin-secrets-jwt
 
-# Check signature
-vault write -field=token jwt/sign @claims.json > jwt.txt
-jwtverify $(cat jwt.txt) $VAULT_ADDR/v1/jwt/jwks | tee result.txt
+# Change the expiry time
+vault write jwt/config "key_ttl=2s" "jwt_ttl=3s"
 
-# Expect the results to match
-[[ $(cat result.txt) =~ "Zapp Brannigan" ]]
+# Create a token
+vault write -field=token jwt/sign @claims.json > jwt1.txt
+
+# Check that the token is as we expect
+jwtverify $(cat jwt1.txt) $VAULT_ADDR/v1/jwt/jwks | tee decoded.txt
+[[ $(cat decoded.txt | jq '.iss') = "Zapp Brannigan" ]]
+[[ $(cat decoded.txt | jq '.exp') =~ [0-9]+ ]]
+
+# Wait and generate a second jwt
+sleep 3
+vault write -field=token jwt/sign @claims.json > jwt2.txt
+sleep 3
+
+# We should be able to verify the second JWT, but not the first.
+jwtverify $(cat jwt2.txt) $VAULT_ADDR/v1/jwt/jwks
+if ! jwtverify $(cat jwt1.txt) $VAULT_ADDR/v1/jwt/jwks; then
+    echo "Key rotated successfully."
+else
+    echo "Key rotation failed, first JWT still valid."
+    exit 1
+fi

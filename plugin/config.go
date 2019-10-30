@@ -5,19 +5,22 @@ import "time"
 // Default values for configuration options.
 const (
 	DefaultKeyRotationPeriod = "15m0s"
-	DefaultKeyExpiryPeriod   = "20m0s"
+	DefaultTokenTTL          = "5m0s"
 )
 
 // Config holds all configuration for the backend.
 type Config struct {
+	// KeyRotationPeriod is how frequently a new key is created.
 	KeyRotationPeriod time.Duration
-	KeyExpiryPeriod   time.Duration
+
+	// TokenTTL defines how long a token is valid for after being signed.
+	TokenTTL time.Duration
 }
 
 // DefaultConfig creates a new default configuration.
 func DefaultConfig() *Config {
 	c := new(Config)
 	c.KeyRotationPeriod, _ = time.ParseDuration(DefaultKeyRotationPeriod)
-	c.KeyExpiryPeriod, _ = time.ParseDuration(DefaultKeyExpiryPeriod)
+	c.TokenTTL, _ = time.ParseDuration(DefaultTokenTTL)
 	return c
 }

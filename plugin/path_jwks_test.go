@@ -75,7 +75,7 @@ func TestJwks(t *testing.T) {
 		t.Fatalf("JWKS was not a %T", []jose.JSONWebKey{})
 	}
 
-	expectedKeys := b.GetPublicKeys().Keys
+	expectedKeys := b.getPublicKeys().Keys
 
 	if len(expectedKeys) == 0 {
 		t.Fatal("Expected at least one key to be present.")

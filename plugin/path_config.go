@@ -9,8 +9,8 @@ import (
 )
 
 const (
-	keyRotationDurationLabel = "key_rotate"
-	keyExpiryDurationLabel   = "key_expire"
+	keyRotationDurationLabel = "key_ttl"
+	keyTokenTTL              = "jwt_ttl"
 )
 
 func pathConfig(b *backend) *framework.Path {
@@ -21,9 +21,9 @@ func pathConfig(b *backend) *framework.Path {
 				Type:        framework.TypeString,
 				Description: `Duration before a key stops being used to sign new tokens.`,
 			},
-			keyExpiryDurationLabel: {
+			keyTokenTTL: {
 				Type:        framework.TypeString,
-				Description: `Duration before a key is discarded and can no longer be used to verify tokens.`,
+				Description: `Duration a token is valid for.`,
 			},
 		},
 
@@ -41,7 +41,7 @@ func pathConfig(b *backend) *framework.Path {
 	}
 }
 
-func (b *backend) pathConfigWrite(_ context.Context, _ *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+func (b *backend) pathConfigWrite(c context.Context, r *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 	b.configLock.Lock()
 	defer b.configLock.Unlock()
 
@@ -53,30 +53,29 @@ func (b *backend) pathConfigWrite(_ context.Context, _ *logical.Request, d *fram
 		b.config.KeyRotationPeriod = duration
 	}
 
-	if newExpiryPeriod, ok := d.GetOk(keyExpiryDurationLabel); ok {
-		duration, err := time.ParseDuration(newExpiryPeriod.(string))
+	if newTTL, ok := d.GetOk(keyTokenTTL); ok {
+		duration, err := time.ParseDuration(newTTL.(string))
 		if err != nil {
 			return nil, err
 		}
-		b.config.KeyExpiryPeriod = duration
+		b.config.TokenTTL = duration
 	}
 
-	return &logical.Response{
-		Data: map[string]interface{}{
-			keyRotationDurationLabel: b.config.KeyRotationPeriod.String(),
-			keyExpiryDurationLabel:   b.config.KeyExpiryPeriod.String(),
-		},
-	}, nil
+	return nonLockingRead(b)
 }
 
 func (b *backend) pathConfigRead(_ context.Context, _ *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 	b.configLock.RLock()
 	defer b.configLock.RUnlock()
 
+	return nonLockingRead(b)
+}
+
+func nonLockingRead(b *backend) (*logical.Response, error) {
 	return &logical.Response{
 		Data: map[string]interface{}{
 			keyRotationDurationLabel: b.config.KeyRotationPeriod.String(),
-			keyExpiryDurationLabel:   b.config.KeyExpiryPeriod.String(),
+			keyTokenTTL:              b.config.TokenTTL.String(),
 		},
 	}, nil
 }
@@ -88,5 +87,7 @@ Configure the backend.
 const pathConfigHelpDesc = `
 Configure the backend.
 
-max_ttl: Duration before a signing key is rotated.
+key_ttl: Duration before a key stops signing new tokens and a new one is generated.
+		 After this period the public key will still be available to verify JWTs.
+jwt_ttl: Duration before a token expires.
 `

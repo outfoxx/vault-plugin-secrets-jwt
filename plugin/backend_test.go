@@ -3,6 +3,7 @@ package jwtsecrets
 import (
 	"context"
 	"testing"
+	"time"
 
 	log "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault/sdk/helper/logging"
@@ -24,6 +25,8 @@ func getTestBackend(t *testing.T) (*backend, logical.Storage) {
 	if err = b.Setup(context.Background(), config); err != nil {
 		t.Fatalf("unable to create backend: %v", err)
 	}
+
+	b.clock = &fakeClock{time.Unix(0, 0)}
 
 	return b, config.StorageView
 }

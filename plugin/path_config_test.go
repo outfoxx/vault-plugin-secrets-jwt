@@ -11,7 +11,7 @@ import (
 const (
 	updatedRotationPeriod       = "5m0s"
 	secondUpdatedRotationPeriod = "1h0m0s"
-	updatedExpiryPeriod         = "6m0s"
+	updatedTTL                  = "6m0s"
 )
 
 func TestDefaultConfig(t *testing.T) {
@@ -29,13 +29,13 @@ func TestDefaultConfig(t *testing.T) {
 	}
 
 	rotationPeriod := resp.Data[keyRotationDurationLabel].(string)
-	expiryPeriod := resp.Data[keyExpiryDurationLabel].(string)
+	tokenTTL := resp.Data[keyTokenTTL].(string)
 
 	if diff := deep.Equal(DefaultKeyRotationPeriod, rotationPeriod); diff != nil {
 		t.Error(diff)
 	}
 
-	if diff := deep.Equal(DefaultKeyExpiryPeriod, expiryPeriod); diff != nil {
+	if diff := deep.Equal(DefaultTokenTTL, tokenTTL); diff != nil {
 		t.Error(diff)
 	}
 }
@@ -58,13 +58,13 @@ func TestWriteConfig(t *testing.T) {
 	}
 
 	rotationPeriod := resp.Data[keyRotationDurationLabel].(string)
-	expiryPeriod := resp.Data[keyExpiryDurationLabel].(string)
+	tokenTTL := resp.Data[keyTokenTTL].(string)
 
 	if diff := deep.Equal(updatedRotationPeriod, rotationPeriod); diff != nil {
 		t.Error("failed to update rotation period:", diff)
 	}
 
-	if diff := deep.Equal(DefaultKeyExpiryPeriod, expiryPeriod); diff != nil {
+	if diff := deep.Equal(DefaultTokenTTL, tokenTTL); diff != nil {
 		t.Error("expiry period should be unchanged:", diff)
 	}
 
@@ -74,7 +74,7 @@ func TestWriteConfig(t *testing.T) {
 		Storage:   storage,
 		Data: map[string]interface{}{
 			keyRotationDurationLabel: secondUpdatedRotationPeriod,
-			keyExpiryDurationLabel:   updatedExpiryPeriod,
+			keyTokenTTL:              updatedTTL,
 		},
 	}
 
@@ -84,13 +84,13 @@ func TestWriteConfig(t *testing.T) {
 	}
 
 	rotationPeriod = resp.Data[keyRotationDurationLabel].(string)
-	expiryPeriod = resp.Data[keyExpiryDurationLabel].(string)
+	tokenTTL = resp.Data[keyTokenTTL].(string)
 
 	if diff := deep.Equal(secondUpdatedRotationPeriod, rotationPeriod); diff != nil {
 		t.Error("failed to update rotation period:", diff)
 	}
 
-	if diff := deep.Equal(updatedExpiryPeriod, expiryPeriod); diff != nil {
+	if diff := deep.Equal(updatedTTL, tokenTTL); diff != nil {
 		t.Error("expiry period should be unchanged:", diff)
 	}
 }

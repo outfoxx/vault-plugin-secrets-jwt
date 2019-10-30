@@ -24,7 +24,7 @@ func pathJwks(b *backend) *framework.Path {
 func (b *backend) pathJwksRead(_ context.Context, _ *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
 	return &logical.Response{
 		Data: map[string]interface{}{
-			"keys": b.GetPublicKeys().Keys,
+			"keys": b.getPublicKeys().Keys,
 		},
 	}, nil
 }

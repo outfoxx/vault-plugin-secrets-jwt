@@ -2,12 +2,16 @@ package jwtsecrets
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 )
+
+// ReservedClaims are claims which can be set by the backend. Attempting to set them manually causes an error.
+var ReservedClaims = []string{"exp"}
 
 func pathSign(b *backend) *framework.Path {
 	return &framework.Path{
@@ -41,7 +45,19 @@ func (b *backend) pathSignWrite(_ context.Context, _ *logical.Request, d *framew
 		return logical.ErrorResponse("claims not a map"), logical.ErrInvalidRequest
 	}
 
-	key, err := b.GetKey()
+	if err := checkReservedFields(claims); err != nil {
+		return logical.ErrorResponse(err.Error()), logical.ErrInvalidRequest
+	}
+
+	// Get a local copy of config, to minimize time with the lock
+	b.configLock.RLock()
+	config := *b.config
+	b.configLock.RUnlock()
+
+	expiry := b.clock.Now().Add(config.TokenTTL)
+	claims["exp"] = jwt.NumericDate(expiry.Unix())
+
+	key, err := b.GetKey(expiry)
 	if err != nil {
 		return nil, err
 	}
@@ -61,6 +77,16 @@ func (b *backend) pathSignWrite(_ context.Context, _ *logical.Request, d *framew
 			"token": token,
 		},
 	}, nil
+}
+
+func checkReservedFields(claims map[string]interface{}) error {
+	for _, reservedClaim := range ReservedClaims {
+		if _, ok := claims[reservedClaim]; ok {
+			return fmt.Errorf("claim `%s` is reserved", reservedClaim)
+		}
+	}
+
+	return nil
 }
 
 const pathSignHelpSyn = `

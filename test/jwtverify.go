@@ -70,7 +70,12 @@ func validateToken(rawToken, jwksEndpoint string) error {
 	cl := jwt.Claims{}
 	for _, key := range matchingKeys {
 		if err = tok.Claims(key.Key, &cl); err == nil {
-			fmt.Println(cl)
+			jsonClaims, err := json.Marshal(cl)
+			if err != nil {
+				return fmt.Errorf("error serializing decoded claims: %v", err)
+			}
+
+			fmt.Printf("%s\n", jsonClaims)
 			return nil
 		}
 		fmt.Fprintln(os.Stderr, err)
