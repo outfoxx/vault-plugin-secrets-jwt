@@ -1,3 +1,4 @@
+// Package vault-plugin-secrets-jwt provides a jwt-signing secrets backend for Hashicorp Vault.
 package main
 
 import (

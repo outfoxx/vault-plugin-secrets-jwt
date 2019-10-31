@@ -1,3 +1,4 @@
+// Package jwtsecrets implements the vault-plugin-jwt-secrets backend.
 package jwtsecrets
 
 import (
@@ -14,7 +15,7 @@ type backend struct {
 	clock      clock
 	config     *Config
 	configLock *sync.RWMutex
-	keys       []*SigningKey
+	keys       []*signingKey
 	keysLock   *sync.RWMutex
 }
 
@@ -34,7 +35,7 @@ func makeBackend() (*backend, error) {
 	var b = &backend{}
 
 	b.keysLock = new(sync.RWMutex)
-	b.keys = make([]*SigningKey, 0)
+	b.keys = make([]*signingKey, 0)
 
 	b.configLock = new(sync.RWMutex)
 	b.config = DefaultConfig()

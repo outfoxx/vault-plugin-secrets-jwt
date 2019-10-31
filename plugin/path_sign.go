@@ -54,10 +54,10 @@ func (b *backend) pathSignWrite(_ context.Context, _ *logical.Request, d *framew
 	config := *b.config
 	b.configLock.RUnlock()
 
-	expiry := b.clock.Now().Add(config.TokenTTL)
+	expiry := b.clock.now().Add(config.TokenTTL)
 	claims["exp"] = jwt.NumericDate(expiry.Unix())
 
-	key, err := b.GetKey(expiry)
+	key, err := b.getKey(expiry)
 	if err != nil {
 		return nil, err
 	}

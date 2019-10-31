@@ -10,15 +10,16 @@ import (
 	"gopkg.in/square/go-jose.v2"
 )
 
-// SigningKey holds a RSA key with a specified TTL.
-type SigningKey struct {
+// signingKey holds a RSA key with a specified TTL.
+type signingKey struct {
 	UseUntil  time.Time
 	KeepUntil time.Time
 	Key       *rsa.PrivateKey
 	ID        string
 }
 
-func (b *backend) GetKey(validUntil time.Time) (*SigningKey, error) {
+// getKey will return a valid key is one is available, or otherwise generate a new one.
+func (b *backend) getKey(validUntil time.Time) (*signingKey, error) {
 	key, err := b.getExistingKey(validUntil)
 	if err == nil {
 		return key, nil
@@ -27,8 +28,8 @@ func (b *backend) GetKey(validUntil time.Time) (*SigningKey, error) {
 	return b.getNewKey()
 }
 
-func (b *backend) getExistingKey(validUntil time.Time) (*SigningKey, error) {
-	now := b.clock.Now()
+func (b *backend) getExistingKey(validUntil time.Time) (*signingKey, error) {
+	now := b.clock.now()
 
 	b.keysLock.RLock()
 	defer b.keysLock.RUnlock()
@@ -42,7 +43,7 @@ func (b *backend) getExistingKey(validUntil time.Time) (*SigningKey, error) {
 	return nil, errors.New("no valid key found")
 }
 
-func (b *backend) getNewKey() (*SigningKey, error) {
+func (b *backend) getNewKey() (*signingKey, error) {
 	b.keysLock.Lock()
 	defer b.keysLock.Unlock()
 
@@ -58,9 +59,9 @@ func (b *backend) getNewKey() (*SigningKey, error) {
 
 	b.configLock.RLock()
 
-	rotationTime := b.clock.Now().Add(b.config.KeyRotationPeriod)
+	rotationTime := b.clock.now().Add(b.config.KeyRotationPeriod)
 
-	newKey := &SigningKey{
+	newKey := &signingKey{
 		ID:        kid.String(),
 		Key:       privateKey,
 		UseUntil:  rotationTime,
@@ -74,7 +75,7 @@ func (b *backend) getNewKey() (*SigningKey, error) {
 }
 
 func (b *backend) pruneOldKeys() {
-	now := b.clock.Now()
+	now := b.clock.now()
 
 	b.keysLock.Lock()
 	defer b.keysLock.Unlock()

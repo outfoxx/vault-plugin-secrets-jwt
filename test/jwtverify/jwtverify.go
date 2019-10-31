@@ -1,3 +1,4 @@
+// jwtverify is a utility to parse and verify the signatures of JWTs.
 package main
 
 import (
