@@ -1,5 +1,5 @@
 {
     "claims": {
-        "iss": "Zapp Brannigan"
+        "sub": "Zapp Brannigan"
     }
 }

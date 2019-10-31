@@ -10,6 +10,8 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
+const testIssuer = "vault-plugin-secrets-jwt:test"
+
 func getTestBackend(t *testing.T) (*backend, logical.Storage) {
 	config := &logical.BackendConfig{
 		Logger:      logging.NewVaultLogger(log.Trace),
@@ -18,7 +20,7 @@ func getTestBackend(t *testing.T) (*backend, logical.Storage) {
 		BackendUUID: "test",
 	}
 
-	b, err := makeBackend()
+	b, err := makeBackend("test")
 	if err != nil {
 		t.Fatalf("unable to create backend: %v", err)
 	}
@@ -27,6 +29,7 @@ func getTestBackend(t *testing.T) (*backend, logical.Storage) {
 	}
 
 	b.clock = &fakeClock{time.Unix(0, 0)}
+	b.uuidGen = &fakeUUIDGenerator{0}
 
 	return b, config.StorageView
 }

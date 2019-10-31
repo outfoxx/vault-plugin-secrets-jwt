@@ -11,7 +11,7 @@ import (
 )
 
 // ReservedClaims are claims which can be set by the backend. Attempting to set them manually causes an error.
-var ReservedClaims = []string{"exp"}
+var ReservedClaims = []string{"exp", "iat", "iss", "jti"}
 
 func pathSign(b *backend) *framework.Path {
 	return &framework.Path{
@@ -56,6 +56,22 @@ func (b *backend) pathSignWrite(_ context.Context, _ *logical.Request, d *framew
 
 	expiry := b.clock.now().Add(config.TokenTTL)
 	claims["exp"] = jwt.NumericDate(expiry.Unix())
+
+	if config.SetIat {
+		claims["iat"] = jwt.NumericDate(b.clock.now().Unix())
+	}
+
+	if config.SetJTI {
+		jti, err := b.uuidGen.uuid()
+		if err != nil {
+			return nil, fmt.Errorf("could not generate jti: %v", err)
+		}
+		claims["jti"] = jti
+	}
+
+	if config.Issuer != "" {
+		claims["iss"] = config.Issuer
+	}
 
 	key, err := b.getKey(expiry)
 	if err != nil {

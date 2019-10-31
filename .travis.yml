@@ -3,6 +3,8 @@ language: go
 go:
 - 1.13.x
 
+if: tag IS blank
+
 jobs:
   include:
     - name: Unit Tests
