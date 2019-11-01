@@ -5,6 +5,10 @@ go:
 
 if: tag IS blank
 
+branches:
+  only:
+    - master
+
 jobs:
   include:
     - name: Unit Tests

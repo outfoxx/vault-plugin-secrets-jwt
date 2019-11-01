@@ -29,6 +29,11 @@ type vaultResponse struct {
 	Data jose.JSONWebKeySet `json:"data"`
 }
 
+type customToken struct {
+	jwt.Claims
+	Foo string `json:"foo"`
+}
+
 func validateToken(rawToken, jwksEndpoint string) error {
 	tok, err := jwt.ParseSigned(rawToken)
 	if err != nil {
@@ -68,7 +73,7 @@ func validateToken(rawToken, jwksEndpoint string) error {
 		return fmt.Errorf("no matching keys for kid %s", kid)
 	}
 
-	cl := jwt.Claims{}
+	cl := customToken{}
 	for _, key := range matchingKeys {
 		if err = tok.Claims(key.Key, &cl); err == nil {
 			jsonClaims, err := json.Marshal(cl)

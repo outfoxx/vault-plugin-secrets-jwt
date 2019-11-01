@@ -15,7 +15,7 @@ func TestEmptyJwks(t *testing.T) {
 	req := &logical.Request{
 		Operation: logical.ReadOperation,
 		Path:      "jwks",
-		Storage:   storage,
+		Storage:   *storage,
 	}
 
 	resp, err := b.HandleRequest(context.Background(), req)
@@ -39,14 +39,14 @@ func TestJwks(t *testing.T) {
 	// Cause it to generate a key
 	data := map[string]interface{}{
 		"claims": map[string]interface{}{
-			"bar": "baz",
+			"aud": "Zapp Brannigan",
 		},
 	}
 
 	req := &logical.Request{
 		Operation: logical.UpdateOperation,
 		Path:      "sign",
-		Storage:   storage,
+		Storage:   *storage,
 		Data:      data,
 	}
 	resp, err := b.HandleRequest(context.Background(), req)
@@ -57,7 +57,7 @@ func TestJwks(t *testing.T) {
 	req = &logical.Request{
 		Operation: logical.ReadOperation,
 		Path:      "jwks",
-		Storage:   storage,
+		Storage:   *storage,
 	}
 
 	resp, err = b.HandleRequest(context.Background(), req)

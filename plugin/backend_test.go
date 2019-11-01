@@ -12,7 +12,7 @@ import (
 
 const testIssuer = "vault-plugin-secrets-jwt:test"
 
-func getTestBackend(t *testing.T) (*backend, logical.Storage) {
+func getTestBackend(t *testing.T) (*backend, *logical.Storage) {
 	config := &logical.BackendConfig{
 		Logger:      logging.NewVaultLogger(log.Trace),
 		System:      &logical.StaticSystemView{},
@@ -31,5 +31,5 @@ func getTestBackend(t *testing.T) (*backend, logical.Storage) {
 	b.clock = &fakeClock{time.Unix(0, 0)}
 	b.uuidGen = &fakeUUIDGenerator{0}
 
-	return b, config.StorageView
+	return b, &config.StorageView
 }

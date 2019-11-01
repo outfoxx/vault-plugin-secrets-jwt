@@ -21,7 +21,7 @@ func TestDefaultConfig(t *testing.T) {
 	req := &logical.Request{
 		Operation: logical.ReadOperation,
 		Path:      "config",
-		Storage:   storage,
+		Storage:   *storage,
 	}
 
 	resp, err := b.HandleRequest(context.Background(), req)
@@ -29,7 +29,7 @@ func TestDefaultConfig(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	rotationPeriod := resp.Data[keyRotationDurationLabel].(string)
+	rotationPeriod := resp.Data[keyRotationDuration].(string)
 	tokenTTL := resp.Data[keyTokenTTL].(string)
 
 	if diff := deep.Equal(DefaultKeyRotationPeriod, rotationPeriod); diff != nil {
@@ -47,9 +47,9 @@ func TestWriteConfig(t *testing.T) {
 	req := &logical.Request{
 		Operation: logical.UpdateOperation,
 		Path:      "config",
-		Storage:   storage,
+		Storage:   *storage,
 		Data: map[string]interface{}{
-			keyRotationDurationLabel: updatedRotationPeriod,
+			keyRotationDuration: updatedRotationPeriod,
 		},
 	}
 
@@ -58,10 +58,11 @@ func TestWriteConfig(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	rotationPeriod := resp.Data[keyRotationDurationLabel].(string)
+	rotationPeriod := resp.Data[keyRotationDuration].(string)
 	tokenTTL := resp.Data[keyTokenTTL].(string)
-	setIat := resp.Data[keySetIat].(bool)
-	setJti := resp.Data[keySetJTI].(bool)
+	setIAT := resp.Data[keySetIAT].(bool)
+	setJTI := resp.Data[keySetJTI].(bool)
+	setNBF := resp.Data[keySetNBF].(bool)
 	issuer := resp.Data[keyIssuer].(string)
 
 	if diff := deep.Equal(updatedRotationPeriod, rotationPeriod); diff != nil {
@@ -72,12 +73,16 @@ func TestWriteConfig(t *testing.T) {
 		t.Error("expiry period should be unchanged:", diff)
 	}
 
-	if diff := deep.Equal(DefaultSetIat, setIat); diff != nil {
+	if diff := deep.Equal(DefaultSetIAT, setIAT); diff != nil {
 		t.Error("set_iat should be unchanged:", diff)
 	}
 
-	if diff := deep.Equal(DefaultSetJTI, setJti); diff != nil {
+	if diff := deep.Equal(DefaultSetJTI, setJTI); diff != nil {
 		t.Error("set_jti should be unchanged:", diff)
+	}
+
+	if diff := deep.Equal(DefaultSetNBF, setNBF); diff != nil {
+		t.Error("set_nbf should be unchanged:", diff)
 	}
 
 	if diff := deep.Equal(testIssuer, issuer); diff != nil {
@@ -87,13 +92,14 @@ func TestWriteConfig(t *testing.T) {
 	req = &logical.Request{
 		Operation: logical.UpdateOperation,
 		Path:      "config",
-		Storage:   storage,
+		Storage:   *storage,
 		Data: map[string]interface{}{
-			keyRotationDurationLabel: secondUpdatedRotationPeriod,
-			keyTokenTTL:              updatedTTL,
-			keySetIat:                false,
-			keySetJTI:                false,
-			keyIssuer:                newIssuer,
+			keyRotationDuration: secondUpdatedRotationPeriod,
+			keyTokenTTL:         updatedTTL,
+			keySetIAT:           false,
+			keySetJTI:           false,
+			keySetNBF:           false,
+			keyIssuer:           newIssuer,
 		},
 	}
 
@@ -102,9 +108,11 @@ func TestWriteConfig(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	rotationPeriod = resp.Data[keyRotationDurationLabel].(string)
+	rotationPeriod = resp.Data[keyRotationDuration].(string)
 	tokenTTL = resp.Data[keyTokenTTL].(string)
-	setIat = resp.Data[keySetIat].(bool)
+	setIAT = resp.Data[keySetIAT].(bool)
+	setJTI = resp.Data[keySetJTI].(bool)
+	setNBF = resp.Data[keySetNBF].(bool)
 	issuer = resp.Data[keyIssuer].(string)
 
 	if diff := deep.Equal(secondUpdatedRotationPeriod, rotationPeriod); diff != nil {
@@ -115,8 +123,16 @@ func TestWriteConfig(t *testing.T) {
 		t.Error("expiry period should be unchanged:", diff)
 	}
 
-	if diff := deep.Equal(false, setIat); diff != nil {
+	if diff := deep.Equal(false, setIAT); diff != nil {
 		t.Error("expected set_iat to be false")
+	}
+
+	if diff := deep.Equal(false, setJTI); diff != nil {
+		t.Error("expected set_jti to be false")
+	}
+
+	if diff := deep.Equal(false, setNBF); diff != nil {
+		t.Error("expected set_nbf to be false")
 	}
 
 	if diff := deep.Equal(newIssuer, issuer); diff != nil {
@@ -130,13 +146,27 @@ func TestWriteInvalidConfig(t *testing.T) {
 	req := &logical.Request{
 		Operation: logical.UpdateOperation,
 		Path:      "config",
-		Storage:   storage,
+		Storage:   *storage,
 		Data: map[string]interface{}{
-			keyRotationDurationLabel: "not a real duration",
+			keyRotationDuration: "not a real duration",
 		},
 	}
 
 	resp, err := b.HandleRequest(context.Background(), req)
+	if err == nil {
+		t.Errorf("Should have errored but got response: %#v", resp)
+	}
+
+	req = &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "config",
+		Storage:   *storage,
+		Data: map[string]interface{}{
+			keyAudiencePattern: "(",
+		},
+	}
+
+	resp, err = b.HandleRequest(context.Background(), req)
 	if err == nil {
 		t.Errorf("Should have errored but got response: %#v", resp)
 	}

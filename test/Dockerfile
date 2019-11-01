@@ -18,7 +18,7 @@ FROM alpine
 RUN apk add bash jq
 COPY --from=vault-installer /vault /usr/local/bin/
 COPY test/config.hcl /vault/
-COPY test/claims.json test/test.sh /test/
+COPY test/testdata/* test/test.sh /test/
 COPY --from=plugin-builder /vault/plugins /vault/plugins/
 COPY --from=plugin-builder /go/bin/jwtverify /usr/local/bin/
 
