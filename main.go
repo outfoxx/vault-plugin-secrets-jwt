@@ -2,20 +2,22 @@
 package main
 
 import (
-	"log"
 	"os"
 
+	"github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault/api"
 	"github.com/hashicorp/vault/sdk/plugin"
-	jwtsecrets "github.com/ian-fox/vault-plugin-secrets-jwt/plugin"
+	jwtsecrets "github.com/outfoxx/vault-plugin-secrets-jwt/plugin"
 )
 
 func main() {
+	logger := hclog.New(&hclog.LoggerOptions{})
+
 	apiClientMeta := &api.PluginAPIClientMeta{}
 	flags := apiClientMeta.FlagSet()
 	err := flags.Parse(os.Args[1:])
 	if err != nil {
-		log.Println(err)
+		logger.Error("plugin shutting down", "invalid args", err)
 		os.Exit(1)
 	}
 
@@ -27,7 +29,7 @@ func main() {
 		TLSProviderFunc:    tlsProviderFunc,
 	})
 	if err != nil {
-		log.Println(err)
+		logger.Error("plugin shutting down", "serve error", err)
 		os.Exit(1)
 	}
 }

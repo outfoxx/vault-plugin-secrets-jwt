@@ -2,6 +2,7 @@ package jwtsecrets
 
 import (
 	"context"
+	"gopkg.in/square/go-jose.v2"
 	"regexp"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 )
 
 const (
+	keySignatureAlgorithm  = "sig_alg"
+	keyRSAKeyBits          = "rsa_key_bits"
 	keyRotationDuration    = "key_ttl"
 	keyTokenTTL            = "jwt_ttl"
 	keySetIAT              = "set_iat"
@@ -26,13 +29,21 @@ func pathConfig(b *backend) *framework.Path {
 	return &framework.Path{
 		Pattern: "config",
 		Fields: map[string]*framework.FieldSchema{
+			keySignatureAlgorithm: {
+				Type:        framework.TypeString,
+				Description: `Signature algorithm used to sign new tokens.`,
+			},
+			keyRSAKeyBits: {
+				Type:        framework.TypeInt,
+				Description: `Size of generated RSA keys, when signature algorithm is one of the allowed RSA signing algorithm.`,
+			},
 			keyRotationDuration: {
 				Type:        framework.TypeString,
-				Description: `Duration before a key stops being used to sign new tokens.`,
+				Description: `Duration a specific key will be used to sign new tokens.`,
 			},
 			keyTokenTTL: {
 				Type:        framework.TypeString,
-				Description: `Duration a token is valid for.`,
+				Description: `Duration a token is valid for (mapped to the 'exp' claim).`,
 			},
 			keySetIAT: {
 				Type:        framework.TypeBool,
@@ -83,9 +94,31 @@ Note: 'aud' and 'sub' should be in this list if you would like to set them.`,
 	}
 }
 
-func (b *backend) pathConfigWrite(c context.Context, r *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+func (b *backend) pathConfigWrite(_ context.Context, _ *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 	b.configLock.Lock()
 	defer b.configLock.Unlock()
+
+	if newRawSignatureAlgorithmName, ok := d.GetOk(keySignatureAlgorithm); ok {
+		newSignatureAlgorithmName, ok := newRawSignatureAlgorithmName.(string)
+		if !ok {
+			return logical.ErrorResponse("sig_alg must be a string"), logical.ErrInvalidRequest
+		}
+		if !stringInSlice(newSignatureAlgorithmName, AllowedSignatureAlgorithmNames) {
+			return logical.ErrorResponse("unknown/unsupported signature algorithm, must be one of %s", AllowedSignatureAlgorithmNames), logical.ErrInvalidRequest
+		}
+		b.config.SignatureAlgorithm = jose.SignatureAlgorithm(newSignatureAlgorithmName)
+	}
+
+	if newRawRSAKeyBits, ok := d.GetOk(keyRSAKeyBits); ok {
+		newRSAKeyBits, ok := newRawRSAKeyBits.(int)
+		if !ok {
+			return logical.ErrorResponse("rsa_key_bits must be an integer"), logical.ErrInvalidRequest
+		}
+		if !intInSlice(newRSAKeyBits, AllowedRSAKeyBits) {
+			return logical.ErrorResponse("unsupported rsa_key_bits, must be one of %s", AllowedRSAKeyBits), logical.ErrInvalidRequest
+		}
+		b.config.RSAKeyBits = newRSAKeyBits
+	}
 
 	if newRotationPeriod, ok := d.GetOk(keyRotationDuration); ok {
 		duration, err := time.ParseDuration(newRotationPeriod.(string))
@@ -140,14 +173,24 @@ func (b *backend) pathConfigWrite(c context.Context, r *logical.Request, d *fram
 	}
 
 	if newAllowedClaims, ok := d.GetOk(keyAllowedClaims); ok {
+
+		// Check allowed claims doesn't contain reserved claims
+		for _, newAllowedClaim := range newAllowedClaims.([]string) {
+			if stringInSlice(newAllowedClaim, ReservedClaims) {
+				return logical.ErrorResponse("'%s' claim is reserved and not permitted in allowed_claims", newAllowedClaim), logical.ErrInvalidRequest
+			}
+		}
+
 		b.config.AllowedClaims = newAllowedClaims.([]string)
 		b.config.allowedClaimsMap = makeAllowedClaimsMap(newAllowedClaims.([]string))
 	}
 
+	b.updateConfigOfKeys(b.config.KeyRotationPeriod, b.config.TokenTTL)
+
 	return nonLockingRead(b)
 }
 
-func (b *backend) pathConfigRead(_ context.Context, _ *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+func (b *backend) pathConfigRead(_ context.Context, _ *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
 	b.configLock.RLock()
 	defer b.configLock.RUnlock()
 
@@ -169,6 +212,24 @@ func nonLockingRead(b *backend) (*logical.Response, error) {
 			keyAllowedClaims:       b.config.AllowedClaims,
 		},
 	}, nil
+}
+
+func stringInSlice(a string, list []string) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
+}
+
+func intInSlice(a int, list []int) bool {
+	for _, b := range list {
+		if b == a {
+			return true
+		}
+	}
+	return false
 }
 
 const pathConfigHelpSyn = `

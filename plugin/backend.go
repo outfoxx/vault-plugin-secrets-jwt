@@ -17,7 +17,7 @@ type backend struct {
 	configLock *sync.RWMutex
 	keys       []*signingKey
 	keysLock   *sync.RWMutex
-	uuidGen    uuidGenerator
+	idGen      uniqueIdGenerator
 }
 
 // Factory returns a new backend as logical.Backend.
@@ -42,7 +42,7 @@ func makeBackend(backendUUID string) (*backend, error) {
 	b.config = DefaultConfig(backendUUID)
 
 	b.clock = realClock{}
-	b.uuidGen = realUUIDGenerator{}
+	b.idGen = friendlyIdGenerator{}
 
 	b.Backend = &framework.Backend{
 		BackendType: logical.TypeLogical,
@@ -50,11 +50,14 @@ func makeBackend(backendUUID string) (*backend, error) {
 		PathsSpecial: &logical.Paths{
 			Unauthenticated: []string{"jwks"},
 		},
-		Paths: []*framework.Path{
-			pathConfig(b),
-			pathJwks(b),
-			pathSign(b),
-		},
+		Paths: framework.PathAppend(
+			pathRole(b),
+			[]*framework.Path{
+				pathConfig(b),
+				pathJwks(b),
+				pathSign(b),
+			},
+		),
 	}
 
 	return b, nil

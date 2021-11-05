@@ -29,7 +29,7 @@ func getTestBackend(t *testing.T) (*backend, *logical.Storage) {
 	}
 
 	b.clock = &fakeClock{time.Unix(0, 0)}
-	b.uuidGen = &fakeUUIDGenerator{0}
+	b.idGen = &fakeIDGenerator{0}
 
 	return b, &config.StorageView
 }

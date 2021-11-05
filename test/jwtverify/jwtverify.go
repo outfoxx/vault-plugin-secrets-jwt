@@ -25,10 +25,6 @@ func main() {
 	}
 }
 
-type vaultResponse struct {
-	Data jose.JSONWebKeySet `json:"data"`
-}
-
 type customToken struct {
 	jwt.Claims
 	Foo string `json:"foo"`
@@ -51,7 +47,7 @@ func validateToken(rawToken, jwksEndpoint string) error {
 		return err
 	}
 
-	var jwks vaultResponse
+	var jwks jose.JSONWebKeySet
 	if err = json.Unmarshal(body, &jwks); err != nil {
 		return err
 	}
@@ -68,7 +64,7 @@ func validateToken(rawToken, jwksEndpoint string) error {
 		return errors.New("no kid header set")
 	}
 
-	matchingKeys := jwks.Data.Key(kid)
+	matchingKeys := jwks.Key(kid)
 	if len(matchingKeys) == 0 {
 		return fmt.Errorf("no matching keys for kid %s", kid)
 	}

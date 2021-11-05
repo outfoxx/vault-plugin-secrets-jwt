@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/mariuszs/friendlyid-go/friendlyid"
 )
 
 // clock is an interface for obtaining the current time.
@@ -28,29 +29,34 @@ func (f fakeClock) now() time.Time {
 	return f.Instant
 }
 
-// uuidGenerator is an interface for generating UUIDs.
-type uuidGenerator interface {
-	uuid() (string, error)
+// uniqueIdGenerator is an interface for generating unique ids.
+type uniqueIdGenerator interface {
+	id() (string, error)
 }
 
-// realUUIDGenerator generates actual UUIDs.
-type realUUIDGenerator struct{}
+// friendlyIdGenerator generates friendly-id formatted UUIDs.
+type friendlyIdGenerator struct{}
 
-func (r realUUIDGenerator) uuid() (string, error) {
+func (fid friendlyIdGenerator) id() (string, error) {
 	generatedUUID, err := uuid.NewUUID()
 	if err != nil {
 		return "", err
 	}
 
-	return generatedUUID.String(), nil
+	generatedFriendlyId, err := friendlyid.Encode(generatedUUID.String())
+	if err != nil {
+		return "", err
+	}
+
+	return generatedFriendlyId, nil
 }
 
-// fakeUUIDGenerator generates a predictable sequence of UUIDs for testing.
-type fakeUUIDGenerator struct {
+// fakeIDGenerator generates a predictable sequence of numeric ids for testing.
+type fakeIDGenerator struct {
 	Counter int
 }
 
-func (f *fakeUUIDGenerator) uuid() (string, error) {
+func (f *fakeIDGenerator) id() (string, error) {
 	f.Counter++
 	return strconv.Itoa(f.Counter), nil
 }

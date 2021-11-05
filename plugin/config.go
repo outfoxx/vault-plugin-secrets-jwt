@@ -1,6 +1,7 @@
 package jwtsecrets
 
 import (
+	"gopkg.in/square/go-jose.v2"
 	"regexp"
 	"strings"
 	"time"
@@ -8,25 +9,36 @@ import (
 
 // Default values for configuration options.
 const (
-	DefaultKeyRotationPeriod = "15m0s"
-	DefaultTokenTTL          = "5m0s"
-	DefaultSetIAT            = true
-	DefaultSetJTI            = true
-	DefaultSetNBF            = true
-	DefaultIssuer            = "vault-plugin-secrets-jwt:UUID"
-	DefaultAudiencePattern   = ".*"
-	DefaultSubjectPattern    = ".*"
-	DefaultMaxAudiences      = -1
+	DefaultSignatureAlgorithm = jose.ES256
+	DefaultRSAKeyBits         = 2048
+	DefaultKeyRotationPeriod  = "15m0s"
+	DefaultTokenTTL           = "5m0s"
+	DefaultSetIAT             = true
+	DefaultSetJTI             = true
+	DefaultSetNBF             = true
+	DefaultIssuer             = "vault-plugin-secrets-jwt:UUID"
+	DefaultAudiencePattern    = ".*"
+	DefaultSubjectPattern     = ".*"
+	DefaultMaxAudiences       = -1
 )
 
 // DefaultAllowedClaims is the default value for the AllowedClaims config option.
-// By default only the 'aud' and 'sub' claims can be set by the caller.
-var DefaultAllowedClaims = []string{"aud", "sub"}
+// By default, only the 'aud' claim can be set by the caller.
+var DefaultAllowedClaims = []string{"aud"}
 
-var ReservedClaims = []string{"iss", "exp", "nbf", "iat", "jti"}
+var ReservedClaims = []string{"sub", "iss", "exp", "nbf", "iat", "jti"}
+
+var AllowedSignatureAlgorithmNames = []string{string(jose.ES256), string(jose.ES384), string(jose.ES512), string(jose.RS256), string(jose.RS384), string(jose.RS512)}
+var AllowedRSAKeyBits = []int{2048, 3072, 4096}
 
 // Config holds all configuration for the backend.
 type Config struct {
+	// SignatureAlgorithm is the signing algorithm to use.
+	SignatureAlgorithm jose.SignatureAlgorithm
+
+	// RSAKeyBits is size of generated RSA keys; only used when SignatureAlgorithm is one of the supported RSA algorithms.
+	RSAKeyBits int
+
 	// KeyRotationPeriod is how frequently a new key is created.
 	KeyRotationPeriod time.Duration
 
@@ -65,6 +77,8 @@ type Config struct {
 // DefaultConfig creates a new default configuration.
 func DefaultConfig(backendUUID string) *Config {
 	c := new(Config)
+	c.SignatureAlgorithm = DefaultSignatureAlgorithm
+	c.RSAKeyBits = DefaultRSAKeyBits
 	c.KeyRotationPeriod, _ = time.ParseDuration(DefaultKeyRotationPeriod)
 	c.TokenTTL, _ = time.ParseDuration(DefaultTokenTTL)
 	c.SetIAT = DefaultSetIAT

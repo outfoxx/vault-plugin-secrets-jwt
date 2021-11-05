@@ -48,8 +48,24 @@ vault secrets enable -path=jwt vault-plugin-secrets-jwt
 # Change the expiry time and make a pattern to check subjects against
 vault write jwt/config "key_ttl=2s" "jwt_ttl=3s" "subject_pattern=^[A-Z][a-z]+ [A-Z][a-z]+$"
 
+# Try to create a token before role is created
+if vault write -field=token jwt/sign/test @claims.json; then
+    echo "Signing with unknown role incorrectly succeeded."
+    exit 1
+fi
+
+# Try to create a role with a subject that doesn't match configured subject_pattern
+if vault write jwt/roles/test "subject=invalid.subject"; then
+    echo "Creating a role that doesn't match subject pattern incorrectly succeeded."
+    exit 1
+fi
+
+# Add a role
+vault write jwt/roles/test subject="Zapp Brannigan"
+vault read jwt/roles/test
+
 # Create a token
-vault write -field=token jwt/sign @claims.json > jwt1.txt
+vault write -field=token jwt/sign/test @claims.json > jwt1.txt
 
 # Check that the token is as we expect
 jwtverify $(cat jwt1.txt) $VAULT_ADDR/v1/jwt/jwks | tee decoded.txt
@@ -65,10 +81,13 @@ if [[ "(( EXP_TIME - IAT_TIME ))" -ne 3 ]]; then
     exit 1
 fi
 
+# Swift to RSA algorithm
+vault write jwt/config "sig_alg=RS256"
+
 # Wait and generate a second jwt
 sleep 3
 vault write jwt/config "set_iat=false"
-vault write -field=token jwt/sign @claims.json > jwt2.txt
+vault write -field=token jwt/sign/test @claims.json > jwt2.txt
 sleep 3
 
 # We should be able to verify the second JWT, but not the first.
@@ -83,17 +102,23 @@ fi
 # Second key should not have an iat claim
 expect_no_match "$(cat decoded2.txt)" "iat" "should not have 'iat' claim"
 
-# Keys should have different UUIDs.
+# Tokens should have different unique ids.
 expect_not_equal $(cat decoded.txt | jq '.jti') $(cat decoded2.txt | jq '.jti') "JTI claims should differ"
 
-# Try to write a claim that violates the subject pattern
-if vault write -field=token jwt/sign @bad_claims.json; then
-    echo "Writing a set of claims which did not match the regex should have failed."
+# Try to write a claim that has a reserved claim
+if vault write -field=token jwt/sign/test @reserved_claims.json; then
+    echo "Writing a set of claims which contains a reserved claim."
     exit 1
 fi
 
-# Allow 'foo' claim
+# Try to write a claim that has a disallowed claim
+if vault write -field=token jwt/sign/test @claims_foo.json; then
+    echo "Writing a set of claims which contains a disallowed claim."
+    exit 1
+fi
+
+# Allow 'foo' claim and check foo is now allowed.
 vault write -field=allowed_claims jwt/config @allowed_claims.json
-vault write -field=token jwt/sign @claims_foo.json > jwt3.txt
+vault write -field=token jwt/sign/test @claims_foo.json > jwt3.txt
 jwtverify $(cat jwt3.txt) $VAULT_ADDR/v1/jwt/jwks | tee decoded3.txt
 expect_equal "$(cat decoded3.txt | jq '.foo')" '"bar"' "jwt should have 'foo' field set"

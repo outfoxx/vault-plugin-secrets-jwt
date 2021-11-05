@@ -1,21 +1,29 @@
 package jwtsecrets
 
 import (
+	"crypto"
+	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
 	"gopkg.in/square/go-jose.v2"
 )
 
-// signingKey holds a RSA key with a specified TTL.
+type AnyPrivateKey interface {
+	Public() crypto.PublicKey
+	Equal(x crypto.PrivateKey) bool
+}
+
+// signingKey holds an RSA/EC key with a specified TTL.
 type signingKey struct {
-	UseUntil  time.Time
-	KeepUntil time.Time
-	Key       *rsa.PrivateKey
-	ID        string
+	Inception  time.Time
+	UseUntil   time.Time
+	KeepUntil  time.Time
+	PrivateKey AnyPrivateKey
+	ID         string
 }
 
 // getKey will return a valid key is one is available, or otherwise generate a new one.
@@ -47,28 +55,45 @@ func (b *backend) getNewKey() (*signingKey, error) {
 	b.keysLock.Lock()
 	defer b.keysLock.Unlock()
 
-	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
-	if err != nil {
-		return nil, err
-	}
-
-	kid, err := uuid.NewRandom()
-	if err != nil {
-		return nil, err
-	}
-
 	b.configLock.RLock()
+	config := b.config
+	b.configLock.RUnlock()
 
-	rotationTime := b.clock.now().Add(b.config.KeyRotationPeriod)
+	var err error
+	var privateKey AnyPrivateKey
+
+	switch config.SignatureAlgorithm {
+	case jose.RS256, jose.RS384, jose.RS512:
+		privateKey, err = rsa.GenerateKey(rand.Reader, config.RSAKeyBits)
+	case jose.ES256:
+		privateKey, err = ecdsa.GenerateKey(elliptic.P256(), rand.Reader)
+	case jose.ES384:
+		privateKey, err = ecdsa.GenerateKey(elliptic.P384(), rand.Reader)
+	case jose.ES512:
+		privateKey, err = ecdsa.GenerateKey(elliptic.P521(), rand.Reader)
+	default:
+		err = errors.New("unknown/unsupported signature algorithm")
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	kid, err := b.idGen.id()
+	if err != nil {
+		return nil, err
+	}
+
+	now := b.clock.now()
+	rotationTime := now.Add(b.config.KeyRotationPeriod)
 
 	newKey := &signingKey{
-		ID:        kid.String(),
-		Key:       privateKey,
-		UseUntil:  rotationTime,
-		KeepUntil: rotationTime.Add(b.config.TokenTTL),
+		ID:         kid,
+		PrivateKey: privateKey,
+		Inception:  now,
+		UseUntil:   rotationTime,
+		KeepUntil:  rotationTime.Add(b.config.TokenTTL),
 	}
-
-	b.configLock.RUnlock()
 
 	b.keys = append(b.keys, newKey)
 	return newKey, nil
@@ -97,16 +122,34 @@ func (b *backend) getPublicKeys() *jose.JSONWebKeySet {
 	b.keysLock.RLock()
 	defer b.keysLock.RUnlock()
 
-	jwks := jose.JSONWebKeySet{
+	jwkSet := jose.JSONWebKeySet{
 		Keys: make([]jose.JSONWebKey, len(b.keys)),
 	}
 
 	for i, k := range b.keys {
-		jwks.Keys[i].Key = &k.Key.PublicKey
-		jwks.Keys[i].KeyID = k.ID
-		jwks.Keys[i].Algorithm = "RS256"
-		jwks.Keys[i].Use = "sig"
+		jwkSet.Keys[i].Key = k.PrivateKey.Public()
+		jwkSet.Keys[i].KeyID = k.ID
+		jwkSet.Keys[i].Algorithm = "RS256"
+		jwkSet.Keys[i].Use = "sig"
 	}
 
-	return &jwks
+	return &jwkSet
+}
+
+func (b *backend) updateConfigOfKeys(keyRotationPeriod time.Duration, tokenTTL time.Duration) {
+
+	b.keysLock.RLock()
+	defer b.keysLock.RUnlock()
+
+	for _, key := range b.keys {
+		key.UseUntil = key.Inception.Add(keyRotationPeriod)
+
+		// Only update the keep until if the new keep until is after
+		// the current one. This ensures shortening a ttl doesn't
+		// prune keys too early.
+		newKeepUntil := key.UseUntil.Add(tokenTTL)
+		if newKeepUntil.After(key.KeepUntil) {
+			key.KeepUntil = newKeepUntil
+		}
+	}
 }

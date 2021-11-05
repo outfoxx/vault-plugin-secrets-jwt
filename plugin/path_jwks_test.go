@@ -2,6 +2,7 @@ package jwtsecrets
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/go-test/deep"
@@ -23,18 +24,29 @@ func TestEmptyJwks(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	typedKeys, ok := resp.Data["keys"].([]jose.JSONWebKey)
+	rawBody, ok := resp.Data[logical.HTTPRawBody].([]byte)
 	if !ok {
-		t.Fatalf("Expected keys to be of type %T. Instead got %T", jose.JSONWebKey{}, resp.Data["keys"])
+		t.Fatalf("No raw body returned.")
 	}
 
-	if len(typedKeys) != 0 {
-		t.Errorf("Expected %v to be an array of length 0.", typedKeys)
+	jwkSet := jose.JSONWebKeySet{}
+	err = json.Unmarshal(rawBody, &jwkSet)
+	if err != nil {
+		t.Fatalf("Cannot unmarshal body to JSONWebKeySet")
+	}
+
+	if len(jwkSet.Keys) != 0 {
+		t.Errorf("Expected %v to be a set with no keys.", jwkSet)
 	}
 }
 
 func TestJwks(t *testing.T) {
 	b, storage := getTestBackend(t)
+
+	err := writeRole(b, storage, "tester", "tester.example.com", map[string]interface{}{})
+	if err != nil {
+		t.Fatalf("%s\n", err)
+	}
 
 	// Cause it to generate a key
 	data := map[string]interface{}{
@@ -45,7 +57,7 @@ func TestJwks(t *testing.T) {
 
 	req := &logical.Request{
 		Operation: logical.UpdateOperation,
-		Path:      "sign",
+		Path:      "sign/tester",
 		Storage:   *storage,
 		Data:      data,
 	}
@@ -65,23 +77,32 @@ func TestJwks(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	rawKeys, ok := resp.Data["keys"]
+	rawBody, ok := resp.Data[logical.HTTPRawBody].([]byte)
 	if !ok {
-		t.Fatalf("No returned keys.")
+		t.Fatalf("No raw body returned.")
 	}
 
-	typedKeys, ok := rawKeys.([]jose.JSONWebKey)
-	if !ok {
-		t.Fatalf("JWKS was not a %T", []jose.JSONWebKey{})
+	jwkSet := jose.JSONWebKeySet{}
+	err = json.Unmarshal(rawBody, &jwkSet)
+	if err != nil {
+		t.Fatalf("Cannot unmarshal body to JSONWebKeySet")
 	}
 
-	expectedKeys := b.getPublicKeys().Keys
+	expectedKeySet := b.getPublicKeys()
+	for i, ek := range expectedKeySet.Keys {
+		data, _ := json.Marshal(ek)
+		var nek jose.JSONWebKey
+		if json.Unmarshal(data, &nek) != nil {
+			t.Fatalf("Unable to transcode key")
+		}
+		expectedKeySet.Keys[i] = nek
+	}
 
-	if len(expectedKeys) == 0 {
+	if len(expectedKeySet.Keys) == 0 {
 		t.Fatal("Expected at least one key to be present.")
 	}
 
-	if diff := deep.Equal(expectedKeys, typedKeys); diff != nil {
+	if diff := deep.Equal(expectedKeySet, &jwkSet); diff != nil {
 		t.Error(diff)
 	}
 }

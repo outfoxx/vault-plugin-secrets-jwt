@@ -9,29 +9,46 @@ import (
 	"gopkg.in/square/go-jose.v2/jwt"
 )
 
+const (
+	keyClaims = "claims"
+)
+
 func pathSign(b *backend) *framework.Path {
 	return &framework.Path{
-		Pattern: "sign",
+		Pattern: "sign/" + framework.GenericNameRegex(keyRoleName),
 		Fields: map[string]*framework.FieldSchema{
-			"claims": {
+			keyRoleName: {
+				Type:        framework.TypeLowerCaseString,
+				Description: "Name of the role",
+				Required:    true,
+			},
+			keyClaims: {
 				Type:        framework.TypeMap,
-				Description: `JSON claim set to sign.`,
+				Description: `JSON claims set to sign.`,
 			},
 		},
-
 		Operations: map[logical.Operation]framework.OperationHandler{
 			logical.UpdateOperation: &framework.PathOperation{
 				Callback: b.pathSignWrite,
 			},
 		},
-
 		HelpSynopsis:    pathSignHelpSyn,
 		HelpDescription: pathSignHelpDesc,
 	}
 }
 
-func (b *backend) pathSignWrite(_ context.Context, _ *logical.Request, d *framework.FieldData) (*logical.Response, error) {
-	rawClaims, ok := d.GetOk("claims")
+func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+	roleName := d.Get("name").(string)
+
+	roleEntry, err := b.getRole(ctx, req.Storage, roleName)
+	if err != nil {
+		return nil, err
+	}
+	if roleEntry == nil {
+		return logical.ErrorResponse("unknown role"), logical.ErrInvalidRequest
+	}
+
+	rawClaims, ok := d.GetOk(keyClaims)
 	if !ok {
 		return logical.ErrorResponse("no claims provided"), logical.ErrInvalidRequest
 	}
@@ -50,7 +67,16 @@ func (b *backend) pathSignWrite(_ context.Context, _ *logical.Request, d *framew
 		if allowedClaim, ok := config.allowedClaimsMap[claim]; !ok || !allowedClaim {
 			return logical.ErrorResponse("claim %s not permitted", claim), logical.ErrInvalidRequest
 		}
+		if _, ok := roleEntry.OtherClaims[claim]; ok {
+			return logical.ErrorResponse("claim %s not permitted, already provided via role configuration", claim), logical.ErrInvalidRequest
+		}
 	}
+
+	for otherClaim := range roleEntry.OtherClaims {
+		claims[otherClaim] = roleEntry.OtherClaims[otherClaim]
+	}
+
+	claims["sub"] = roleEntry.Subject
 
 	now := b.clock.now()
 
@@ -66,7 +92,7 @@ func (b *backend) pathSignWrite(_ context.Context, _ *logical.Request, d *framew
 	}
 
 	if config.SetJTI {
-		jti, err := b.uuidGen.uuid()
+		jti, err := b.idGen.id()
 		if err != nil {
 			return logical.ErrorResponse("could not generate 'jti' claim: %v", err), err
 		}
@@ -75,16 +101,6 @@ func (b *backend) pathSignWrite(_ context.Context, _ *logical.Request, d *framew
 
 	if config.Issuer != "" {
 		claims["iss"] = config.Issuer
-	}
-
-	if rawSub, ok := claims["sub"]; ok {
-		if sub, ok := rawSub.(string); ok {
-			if !config.SubjectPattern.MatchString(sub) {
-				return logical.ErrorResponse("validation of 'sub' claim failed"), logical.ErrInvalidRequest
-			}
-		} else {
-			return logical.ErrorResponse("'sub' claim was %T, not string", rawSub), logical.ErrInvalidRequest
-		}
 	}
 
 	if rawAud, ok := claims["aud"]; ok {
@@ -112,7 +128,7 @@ func (b *backend) pathSignWrite(_ context.Context, _ *logical.Request, d *framew
 		return logical.ErrorResponse("error getting key: %v", err), err
 	}
 
-	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: jose.RS256, Key: key.Key}, (&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", key.ID))
+	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: config.SignatureAlgorithm, Key: key.PrivateKey}, (&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", key.ID))
 	if err != nil {
 		return logical.ErrorResponse("error signing claims: %v", err), err
 	}

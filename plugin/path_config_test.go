@@ -15,6 +15,25 @@ const (
 	newIssuer                   = "new-vault"
 )
 
+func writeConfig(b *backend, storage *logical.Storage, config map[string]interface{}) (*logical.Response, error) {
+
+	req := &logical.Request{
+		Operation: logical.UpdateOperation,
+		Path:      "config",
+		Storage:   *storage,
+		Data:      config,
+	}
+
+	resp, err := b.HandleRequest(context.Background(), req)
+	if err != nil {
+		return nil, err
+	}
+	if resp != nil && resp.IsError() {
+		return nil, resp.Error()
+	}
+	return resp, nil
+}
+
 func TestDefaultConfig(t *testing.T) {
 	b, storage := getTestBackend(t)
 
@@ -44,17 +63,10 @@ func TestDefaultConfig(t *testing.T) {
 func TestWriteConfig(t *testing.T) {
 	b, storage := getTestBackend(t)
 
-	req := &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "config",
-		Storage:   *storage,
-		Data: map[string]interface{}{
-			keyRotationDuration: updatedRotationPeriod,
-		},
-	}
-
-	resp, err := b.HandleRequest(context.Background(), req)
-	if err != nil || (resp != nil && resp.IsError()) {
+	resp, err := writeConfig(b, storage, map[string]interface{}{
+		keyRotationDuration: updatedRotationPeriod,
+	})
+	if err != nil {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
@@ -89,21 +101,14 @@ func TestWriteConfig(t *testing.T) {
 		t.Error("unexpected issuer:", diff)
 	}
 
-	req = &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "config",
-		Storage:   *storage,
-		Data: map[string]interface{}{
-			keyRotationDuration: secondUpdatedRotationPeriod,
-			keyTokenTTL:         updatedTTL,
-			keySetIAT:           false,
-			keySetJTI:           false,
-			keySetNBF:           false,
-			keyIssuer:           newIssuer,
-		},
-	}
-
-	resp, err = b.HandleRequest(context.Background(), req)
+	resp, err = writeConfig(b, storage, map[string]interface{}{
+		keyRotationDuration: secondUpdatedRotationPeriod,
+		keyTokenTTL:         updatedTTL,
+		keySetIAT:           false,
+		keySetJTI:           false,
+		keySetNBF:           false,
+		keyIssuer:           newIssuer,
+	})
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
@@ -143,30 +148,30 @@ func TestWriteConfig(t *testing.T) {
 func TestWriteInvalidConfig(t *testing.T) {
 	b, storage := getTestBackend(t)
 
-	req := &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "config",
-		Storage:   *storage,
-		Data: map[string]interface{}{
-			keyRotationDuration: "not a real duration",
-		},
-	}
-
-	resp, err := b.HandleRequest(context.Background(), req)
+	resp, err := writeConfig(b, storage, map[string]interface{}{
+		keyRotationDuration: "not a real duration",
+	})
 	if err == nil {
 		t.Errorf("Should have errored but got response: %#v", resp)
 	}
 
-	req = &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "config",
-		Storage:   *storage,
-		Data: map[string]interface{}{
-			keyAudiencePattern: "(",
-		},
+	resp, err = writeConfig(b, storage, map[string]interface{}{
+		keyAudiencePattern: "(",
+	})
+	if err == nil {
+		t.Errorf("Should have errored but got response: %#v", resp)
 	}
 
-	resp, err = b.HandleRequest(context.Background(), req)
+	resp, err = writeConfig(b, storage, map[string]interface{}{
+		keyAllowedClaims: []string{"sub"},
+	})
+	if err == nil {
+		t.Errorf("Should have errored but got response: %#v", resp)
+	}
+
+	resp, err = writeConfig(b, storage, map[string]interface{}{
+		keySignatureAlgorithm: "HS256",
+	})
 	if err == nil {
 		t.Errorf("Should have errored but got response: %#v", resp)
 	}
