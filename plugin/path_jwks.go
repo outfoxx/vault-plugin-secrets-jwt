@@ -23,7 +23,12 @@ func pathJwks(b *backend) *framework.Path {
 
 func (b *backend) pathJwksRead(ctx context.Context, req *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
 
-	jwkSet, err := json.Marshal(map[string]interface{}{"keys": b.getPublicKeys(ctx, req.Storage).Keys})
+	jwkSet, err := b.getPublicKeys(ctx, req.Storage)
+	if err != nil {
+		return nil, err
+	}
+
+	jwkSetJson, err := json.Marshal(map[string]interface{}{"keys": jwkSet.Keys})
 	if err != nil {
 		return nil, err
 	}
@@ -32,7 +37,7 @@ func (b *backend) pathJwksRead(ctx context.Context, req *logical.Request, _ *fra
 		Data: map[string]interface{}{
 			logical.HTTPStatusCode:  200,
 			logical.HTTPContentType: "application/jwk-set+json",
-			logical.HTTPRawBody:     jwkSet,
+			logical.HTTPRawBody:     jwkSetJson,
 		},
 	}, nil
 }

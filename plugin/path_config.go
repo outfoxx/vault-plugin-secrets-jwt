@@ -131,8 +131,8 @@ func (b *backend) pathConfigWrite(ctx context.Context, req *logical.Request, d *
 
 		// Recalculate signing key expiration time
 
-		b.keysLock.Lock()
-		defer b.keysLock.Unlock()
+		b.cachedKeysLock.Lock()
+		defer b.cachedKeysLock.Unlock()
 
 		if b.signingKey != nil {
 			b.signingKey.UseUntil = b.signingKey.Inception.Add(duration)

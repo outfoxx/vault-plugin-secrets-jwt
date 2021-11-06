@@ -88,7 +88,11 @@ func TestJwks(t *testing.T) {
 		t.Fatalf("Cannot unmarshal body to JSONWebKeySet")
 	}
 
-	expectedKeySet := b.getPublicKeys(context.Background(), req.Storage)
+	expectedKeySet, err := b.getPublicKeys(context.Background(), req.Storage)
+	if err != nil {
+		t.Fatalf("err: %#v", err)
+	}
+
 	for i, ek := range expectedKeySet.Keys {
 		data, _ := json.Marshal(ek)
 		var nek jose.JSONWebKey

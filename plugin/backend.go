@@ -16,14 +16,14 @@ const (
 
 type backend struct {
 	*framework.Backend
-	clock            clock
-	storagePrefix    string
-	cachedConfig     *Config
-	cachedConfigLock *sync.RWMutex
-	signingKey       *signingKey
-	verificationKeys []*verificationKey
-	keysLock         *sync.RWMutex
-	idGen            uniqueIdGenerator
+	clock                  clock
+	storagePrefix          string
+	cachedConfig           *Config
+	cachedConfigLock       *sync.RWMutex
+	signingKey             *signingKey
+	cachedVerificationKeys []*verificationKey
+	cachedKeysLock         *sync.RWMutex
+	idGen                  uniqueIdGenerator
 }
 
 // Factory returns a new backend as logical.Backend.
@@ -46,8 +46,7 @@ func makeBackend(backendUUID string) (*backend, error) {
 	}
 	b.storagePrefix = backendUUID
 
-	b.keysLock = new(sync.RWMutex)
-
+	b.cachedKeysLock = new(sync.RWMutex)
 	b.cachedConfigLock = new(sync.RWMutex)
 
 	b.clock = realClock{}

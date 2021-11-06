@@ -93,7 +93,6 @@ func (b *backend) getConfig(ctx context.Context, stg logical.Storage) (*Config, 
 
 	// Double check somebody else didn't already cache it
 	if b.cachedConfig != nil {
-		defer b.cachedConfigLock.RUnlock()
 		return &*b.cachedConfig, nil
 	}
 
@@ -114,7 +113,7 @@ func (b *backend) getConfig(ctx context.Context, stg logical.Storage) (*Config, 
 	} else {
 		// Nothing found, initialize configuration to default and save
 		b.cachedConfig = DefaultConfig()
-		if err := b.saveConfig(ctx, stg, b.cachedConfig); err != nil {
+		if err := b.saveConfigUnlocked(ctx, stg, b.cachedConfig); err != nil {
 			return nil, err
 		}
 	}
@@ -123,6 +122,14 @@ func (b *backend) getConfig(ctx context.Context, stg logical.Storage) (*Config, 
 }
 
 func (b *backend) saveConfig(ctx context.Context, stg logical.Storage, config *Config) error {
+	b.cachedConfigLock.Lock()
+	defer b.cachedConfigLock.Unlock()
+
+	return b.saveConfigUnlocked(ctx, stg, config)
+}
+
+func (b *backend) saveConfigUnlocked(ctx context.Context, stg logical.Storage, config *Config) error {
+
 	entry, err := logical.StorageEntryJSON(path.Join(b.storagePrefix, configPath), config)
 	if err != nil {
 		return err
@@ -130,6 +137,9 @@ func (b *backend) saveConfig(ctx context.Context, stg logical.Storage, config *C
 	if err := stg.Put(ctx, entry); err != nil {
 		return err
 	}
+
+	b.cachedConfig = config
+
 	return nil
 }
 
