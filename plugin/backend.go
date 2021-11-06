@@ -3,21 +3,21 @@ package jwtsecrets
 
 import (
 	"context"
-	"strings"
-	"sync"
-
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
+	"strings"
+	"sync"
 )
 
 type backend struct {
 	*framework.Backend
-	clock      clock
-	config     *Config
-	configLock *sync.RWMutex
-	keys       []*signingKey
-	keysLock   *sync.RWMutex
-	idGen      uniqueIdGenerator
+	clock            clock
+	config           *Config
+	configLock       *sync.RWMutex
+	signingKey       *signingKey
+	verificationKeys []*verificationKey
+	keysLock         *sync.RWMutex
+	idGen            uniqueIdGenerator
 }
 
 // Factory returns a new backend as logical.Backend.
@@ -36,7 +36,7 @@ func makeBackend(backendUUID string) (*backend, error) {
 	var b = &backend{}
 
 	b.keysLock = new(sync.RWMutex)
-	b.keys = make([]*signingKey, 0)
+	b.verificationKeys = make([]*verificationKey, 0)
 
 	b.configLock = new(sync.RWMutex)
 	b.config = DefaultConfig(backendUUID)

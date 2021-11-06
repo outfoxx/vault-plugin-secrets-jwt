@@ -12,6 +12,8 @@ import (
 	"gopkg.in/square/go-jose.v2"
 )
 
+var keyPruneExtra, _ = time.ParseDuration("3s")
+
 type AnyPrivateKey interface {
 	Public() crypto.PublicKey
 	Equal(x crypto.PrivateKey) bool
@@ -19,16 +21,23 @@ type AnyPrivateKey interface {
 
 // signingKey holds an RSA/EC key with a specified TTL.
 type signingKey struct {
-	Inception  time.Time
-	UseUntil   time.Time
-	KeepUntil  time.Time
-	PrivateKey AnyPrivateKey
-	ID         string
+	ID                 string
+	PrivateKey         AnyPrivateKey
+	SignatureAlgorithm jose.SignatureAlgorithm
+	Inception          time.Time
+	UseUntil           time.Time
+}
+
+type verificationKey struct {
+	ID                 string
+	PublicKey          crypto.PublicKey
+	SignatureAlgorithm jose.SignatureAlgorithm
+	KeepUntil          time.Time
 }
 
 // getKey will return a valid key is one is available, or otherwise generate a new one.
-func (b *backend) getKey(validUntil time.Time) (*signingKey, error) {
-	key, err := b.getExistingKey(validUntil)
+func (b *backend) getKey() (*signingKey, error) {
+	key, err := b.getExistingKey()
 	if err == nil {
 		return key, nil
 	}
@@ -36,16 +45,14 @@ func (b *backend) getKey(validUntil time.Time) (*signingKey, error) {
 	return b.getNewKey()
 }
 
-func (b *backend) getExistingKey(validUntil time.Time) (*signingKey, error) {
+func (b *backend) getExistingKey() (*signingKey, error) {
 	now := b.clock.now()
 
 	b.keysLock.RLock()
 	defer b.keysLock.RUnlock()
 
-	for _, k := range b.keys {
-		if k.UseUntil.After(now) && k.KeepUntil.After(validUntil) {
-			return k, nil
-		}
+	if b.signingKey != nil && b.signingKey.UseUntil.After(now) {
+		return b.signingKey, nil
 	}
 
 	return nil, errors.New("no valid key found")
@@ -58,6 +65,20 @@ func (b *backend) getNewKey() (*signingKey, error) {
 	b.configLock.RLock()
 	config := b.config
 	b.configLock.RUnlock()
+
+	// Save signing key as verification key
+
+	if b.signingKey != nil {
+		newVerificationKey := &verificationKey{
+			ID:                 b.signingKey.ID,
+			PublicKey:          b.signingKey.PrivateKey.Public(),
+			SignatureAlgorithm: b.signingKey.SignatureAlgorithm,
+			KeepUntil:          b.signingKey.UseUntil.Add(config.TokenTTL).Add(keyPruneExtra),
+		}
+		b.verificationKeys = append(b.verificationKeys, newVerificationKey)
+	}
+
+	// Generate new signing key
 
 	var err error
 	var privateKey AnyPrivateKey
@@ -85,34 +106,36 @@ func (b *backend) getNewKey() (*signingKey, error) {
 	}
 
 	now := b.clock.now()
-	rotationTime := now.Add(b.config.KeyRotationPeriod)
 
-	newKey := &signingKey{
-		ID:         kid,
-		PrivateKey: privateKey,
-		Inception:  now,
-		UseUntil:   rotationTime,
-		KeepUntil:  rotationTime.Add(b.config.TokenTTL),
+	newSigningKey := &signingKey{
+		ID:                 kid,
+		PrivateKey:         privateKey,
+		SignatureAlgorithm: config.SignatureAlgorithm,
+		Inception:          now,
+		UseUntil:           now.Add(config.KeyRotationPeriod),
 	}
 
-	b.keys = append(b.keys, newKey)
-	return newKey, nil
+	b.signingKey = newSigningKey
+
+	return b.signingKey, nil
 }
 
 func (b *backend) pruneOldKeys() {
 	now := b.clock.now()
 
+	_, _ = b.getKey()
+
 	b.keysLock.Lock()
 	defer b.keysLock.Unlock()
 
 	n := 0
-	for _, k := range b.keys {
+	for _, k := range b.verificationKeys {
 		if k.KeepUntil.After(now) {
-			b.keys[n] = k
+			b.verificationKeys[n] = k
 			n++
 		}
 	}
-	b.keys = b.keys[:n]
+	b.verificationKeys = b.verificationKeys[:n]
 }
 
 // GetPublicKeys returns a set of JSON Web Keys.
@@ -122,34 +145,33 @@ func (b *backend) getPublicKeys() *jose.JSONWebKeySet {
 	b.keysLock.RLock()
 	defer b.keysLock.RUnlock()
 
-	jwkSet := jose.JSONWebKeySet{
-		Keys: make([]jose.JSONWebKey, len(b.keys)),
+	keyCount := len(b.verificationKeys)
+	if b.signingKey != nil {
+		keyCount += 1
 	}
 
-	for i, k := range b.keys {
-		jwkSet.Keys[i].Key = k.PrivateKey.Public()
-		jwkSet.Keys[i].KeyID = k.ID
-		jwkSet.Keys[i].Algorithm = "RS256"
-		jwkSet.Keys[i].Use = "sig"
+	jwkSet := jose.JSONWebKeySet{
+		Keys: make([]jose.JSONWebKey, keyCount),
+	}
+
+	kIdx := 0
+
+	// Add verification keys
+	for _, k := range b.verificationKeys {
+		jwkSet.Keys[kIdx].Key = k.PublicKey
+		jwkSet.Keys[kIdx].KeyID = k.ID
+		jwkSet.Keys[kIdx].Algorithm = string(k.SignatureAlgorithm)
+		jwkSet.Keys[kIdx].Use = "sig"
+		kIdx += 1
+	}
+
+	// Add current signing key
+	if b.signingKey != nil {
+		jwkSet.Keys[kIdx].Key = b.signingKey.PrivateKey.Public()
+		jwkSet.Keys[kIdx].KeyID = b.signingKey.ID
+		jwkSet.Keys[kIdx].Algorithm = string(b.signingKey.SignatureAlgorithm)
+		jwkSet.Keys[kIdx].Use = "sig"
 	}
 
 	return &jwkSet
-}
-
-func (b *backend) updateConfigOfKeys(keyRotationPeriod time.Duration, tokenTTL time.Duration) {
-
-	b.keysLock.RLock()
-	defer b.keysLock.RUnlock()
-
-	for _, key := range b.keys {
-		key.UseUntil = key.Inception.Add(keyRotationPeriod)
-
-		// Only update the keep until if the new keep until is after
-		// the current one. This ensures shortening a ttl doesn't
-		// prune keys too early.
-		newKeepUntil := key.UseUntil.Add(tokenTTL)
-		if newKeepUntil.After(key.KeepUntil) {
-			key.KeepUntil = newKeepUntil
-		}
-	}
 }

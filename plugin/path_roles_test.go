@@ -57,6 +57,9 @@ func TestCreate(t *testing.T) {
 	}
 
 	resp, err := readRole(b, storage, role)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
 
 	subject := resp.Data[keySubject].(string)
 	if diff := deep.Equal(role+".example.com", subject); diff != nil {
@@ -88,6 +91,9 @@ func TestCreateRestrictedSubject(t *testing.T) {
 	}
 
 	resp, err = readRole(b, storage, role)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
 
 	subject := resp.Data[keySubject].(string)
 	if diff := deep.Equal(role+".example.com", subject); diff != nil {

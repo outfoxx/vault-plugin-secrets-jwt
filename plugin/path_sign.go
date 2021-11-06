@@ -123,7 +123,7 @@ func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *fr
 		}
 	}
 
-	key, err := b.getKey(expiry)
+	key, err := b.getKey()
 	if err != nil {
 		return logical.ErrorResponse("error getting key: %v", err), err
 	}

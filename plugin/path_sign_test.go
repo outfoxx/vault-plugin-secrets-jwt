@@ -3,11 +3,10 @@ package jwtsecrets
 import (
 	"context"
 	"fmt"
-	"testing"
-
 	"github.com/go-test/deep"
 	"github.com/hashicorp/vault/sdk/logical"
 	"gopkg.in/square/go-jose.v2/jwt"
+	"testing"
 )
 
 func getSignedToken(b *backend, storage *logical.Storage, role string, claims map[string]interface{}, dest interface{}) error {
@@ -42,7 +41,7 @@ func getSignedToken(b *backend, storage *logical.Storage, role string, claims ma
 		return fmt.Errorf("error parsing jwt: %s", err)
 	}
 
-	if err = token.Claims(b.keys[0].PrivateKey.Public(), dest); err != nil {
+	if err = token.Claims(b.signingKey.PrivateKey.Public(), dest); err != nil {
 		return fmt.Errorf("error decoding claims: %s", err)
 	}
 

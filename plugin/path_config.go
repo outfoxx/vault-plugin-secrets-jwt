@@ -126,6 +126,15 @@ func (b *backend) pathConfigWrite(_ context.Context, _ *logical.Request, d *fram
 			return nil, err
 		}
 		b.config.KeyRotationPeriod = duration
+
+		// Recalculate signing key expiration time
+
+		b.keysLock.Lock()
+		defer b.keysLock.Unlock()
+
+		if b.signingKey != nil {
+			b.signingKey.UseUntil = b.signingKey.Inception.Add(duration)
+		}
 	}
 
 	if newTTL, ok := d.GetOk(keyTokenTTL); ok {
@@ -184,8 +193,6 @@ func (b *backend) pathConfigWrite(_ context.Context, _ *logical.Request, d *fram
 		b.config.AllowedClaims = newAllowedClaims.([]string)
 		b.config.allowedClaimsMap = makeAllowedClaimsMap(newAllowedClaims.([]string))
 	}
-
-	b.updateConfigOfKeys(b.config.KeyRotationPeriod, b.config.TokenTTL)
 
 	return nonLockingRead(b)
 }
