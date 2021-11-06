@@ -1,6 +1,7 @@
 package jwtsecrets
 
 import (
+	"github.com/mariuszs/friendlyid-go/friendlyid"
 	"gopkg.in/square/go-jose.v2"
 	"regexp"
 	"strings"
@@ -76,6 +77,14 @@ type Config struct {
 
 // DefaultConfig creates a new default configuration.
 func DefaultConfig(backendUUID string) *Config {
+
+	var backendId string
+	if id, err := friendlyid.Encode(backendUUID); err == nil {
+		backendId = id
+	} else {
+		backendId = backendUUID
+	}
+
 	c := new(Config)
 	c.SignatureAlgorithm = DefaultSignatureAlgorithm
 	c.RSAKeyBits = DefaultRSAKeyBits
@@ -84,7 +93,7 @@ func DefaultConfig(backendUUID string) *Config {
 	c.SetIAT = DefaultSetIAT
 	c.SetJTI = DefaultSetJTI
 	c.SetNBF = DefaultSetNBF
-	c.Issuer = strings.Replace(DefaultIssuer, "UUID", backendUUID, 1)
+	c.Issuer = strings.Replace(DefaultIssuer, "UUID", backendId, 1)
 	c.AudiencePattern = regexp.MustCompile(DefaultAudiencePattern)
 	c.SubjectPattern = regexp.MustCompile(DefaultSubjectPattern)
 	c.MaxAudiences = DefaultMaxAudiences

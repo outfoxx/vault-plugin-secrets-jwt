@@ -2,12 +2,12 @@ package jwtsecrets
 
 import (
 	"context"
-	"testing"
-	"time"
-
+	"github.com/google/uuid"
 	log "github.com/hashicorp/go-hclog"
 	"github.com/hashicorp/vault/sdk/helper/logging"
 	"github.com/hashicorp/vault/sdk/logical"
+	"testing"
+	"time"
 )
 
 const testIssuer = "vault-plugin-secrets-jwt:test"
@@ -20,7 +20,7 @@ func getTestBackend(t *testing.T) (*backend, *logical.Storage) {
 		BackendUUID: "test",
 	}
 
-	b, err := makeBackend("test")
+	b, err := makeBackend(uuid.New().String())
 	if err != nil {
 		t.Fatalf("unable to create backend: %v", err)
 	}
