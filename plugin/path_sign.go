@@ -77,11 +77,13 @@ func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *fr
 	}
 
 	claims["sub"] = roleEntry.Subject
+	responseData := map[string]interface{}{}
 
 	now := b.clock.now()
 
 	expiry := now.Add(config.TokenTTL)
 	claims["exp"] = jwt.NumericDate(expiry.Unix())
+	responseData["expires_at"] = expiry.Unix()
 
 	if config.SetIAT {
 		claims["iat"] = jwt.NumericDate(now.Unix())
@@ -97,6 +99,7 @@ func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *fr
 			return logical.ErrorResponse("could not generate 'jti' claim: %v", err), err
 		}
 		claims["jti"] = jti
+		responseData["id"] = jti
 	}
 
 	if config.Issuer != "" {
@@ -138,10 +141,10 @@ func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *fr
 		return logical.ErrorResponse("error serializing jwt: %v", err), err
 	}
 
+	responseData["token"] = token
+
 	return &logical.Response{
-		Data: map[string]interface{}{
-			"token": token,
-		},
+		Data: responseData,
 	}, nil
 }
 
