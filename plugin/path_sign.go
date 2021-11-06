@@ -58,10 +58,10 @@ func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *fr
 		return logical.ErrorResponse("claims not a map"), logical.ErrInvalidRequest
 	}
 
-	// Get a local copy of config, to minimize time with the lock
-	b.configLock.RLock()
-	config := *b.config
-	b.configLock.RUnlock()
+	config, err := b.getConfig(ctx, req.Storage)
+	if err != nil {
+		return nil, err
+	}
 
 	for claim := range claims {
 		if allowedClaim, ok := config.allowedClaimsMap[claim]; !ok || !allowedClaim {
@@ -126,7 +126,7 @@ func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *fr
 		}
 	}
 
-	key, err := b.getKey()
+	key, err := b.getKey(ctx, req.Storage)
 	if err != nil {
 		return logical.ErrorResponse("error getting key: %v", err), err
 	}

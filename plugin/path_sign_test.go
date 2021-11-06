@@ -75,7 +75,7 @@ func TestSign(t *testing.T) {
 		IssuedAt:  &expectedIssuedAt,
 		NotBefore: &expectedNotBefore,
 		ID:        "1",
-		Issuer:    testIssuer,
+		Issuer:    DefaultIssuer,
 		Subject:   role + ".example.com",
 	}
 
@@ -90,7 +90,10 @@ type customToken struct {
 
 func TestPrivateClaim(t *testing.T) {
 	b, storage := getTestBackend(t)
-	b.config.allowedClaimsMap["foo"] = true
+
+	if _, err := writeConfig(b, storage, map[string]interface{}{"allowed_claims": []string{"aud", "foo"}}); err != nil {
+		t.Fatalf("%v\n", err)
+	}
 
 	role := "tester"
 

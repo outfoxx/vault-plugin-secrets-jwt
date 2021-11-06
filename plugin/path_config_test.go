@@ -97,7 +97,7 @@ func TestWriteConfig(t *testing.T) {
 		t.Error("set_nbf should be unchanged:", diff)
 	}
 
-	if diff := deep.Equal(testIssuer, issuer); diff != nil {
+	if diff := deep.Equal(DefaultIssuer, issuer); diff != nil {
 		t.Error("unexpected issuer:", diff)
 	}
 

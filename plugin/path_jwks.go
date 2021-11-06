@@ -21,9 +21,9 @@ func pathJwks(b *backend) *framework.Path {
 	}
 }
 
-func (b *backend) pathJwksRead(_ context.Context, _ *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
+func (b *backend) pathJwksRead(ctx context.Context, req *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
 
-	jwkSet, err := json.Marshal(map[string]interface{}{"keys": b.getPublicKeys().Keys})
+	jwkSet, err := json.Marshal(map[string]interface{}{"keys": b.getPublicKeys(ctx, req.Storage).Keys})
 	if err != nil {
 		return nil, err
 	}

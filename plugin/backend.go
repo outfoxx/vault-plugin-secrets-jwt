@@ -3,17 +3,23 @@ package jwtsecrets
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 	"strings"
 	"sync"
 )
 
+const (
+	configPath = "config"
+)
+
 type backend struct {
 	*framework.Backend
 	clock            clock
-	config           *Config
-	configLock       *sync.RWMutex
+	storagePrefix    string
+	cachedConfig     *Config
+	cachedConfigLock *sync.RWMutex
 	signingKey       *signingKey
 	verificationKeys []*verificationKey
 	keysLock         *sync.RWMutex
@@ -35,11 +41,14 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 func makeBackend(backendUUID string) (*backend, error) {
 	var b = &backend{}
 
-	b.keysLock = new(sync.RWMutex)
-	b.verificationKeys = make([]*verificationKey, 0)
+	if backendUUID == "" {
+		backendUUID = uuid.New().String()
+	}
+	b.storagePrefix = backendUUID
 
-	b.configLock = new(sync.RWMutex)
-	b.config = DefaultConfig(backendUUID)
+	b.keysLock = new(sync.RWMutex)
+
+	b.cachedConfigLock = new(sync.RWMutex)
 
 	b.clock = realClock{}
 	b.idGen = friendlyIdGenerator{}

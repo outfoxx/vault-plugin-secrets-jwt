@@ -10,8 +10,6 @@ import (
 	"time"
 )
 
-const testIssuer = "vault-plugin-secrets-jwt:test"
-
 func getTestBackend(t *testing.T) (*backend, *logical.Storage) {
 	config := &logical.BackendConfig{
 		Logger:      logging.NewVaultLogger(log.Trace),
@@ -30,6 +28,8 @@ func getTestBackend(t *testing.T) (*backend, *logical.Storage) {
 
 	b.clock = &fakeClock{time.Unix(0, 0)}
 	b.idGen = &fakeIDGenerator{0}
+
+	_ = b.clearConfig(context.Background(), config.StorageView)
 
 	return b, &config.StorageView
 }

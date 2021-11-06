@@ -94,9 +94,11 @@ Note: 'aud' and 'sub' should be in this list if you would like to set them.`,
 	}
 }
 
-func (b *backend) pathConfigWrite(_ context.Context, _ *logical.Request, d *framework.FieldData) (*logical.Response, error) {
-	b.configLock.Lock()
-	defer b.configLock.Unlock()
+func (b *backend) pathConfigWrite(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
+	config, err := b.getConfig(ctx, req.Storage)
+	if err != nil {
+		return nil, err
+	}
 
 	if newRawSignatureAlgorithmName, ok := d.GetOk(keySignatureAlgorithm); ok {
 		newSignatureAlgorithmName, ok := newRawSignatureAlgorithmName.(string)
@@ -106,7 +108,7 @@ func (b *backend) pathConfigWrite(_ context.Context, _ *logical.Request, d *fram
 		if !stringInSlice(newSignatureAlgorithmName, AllowedSignatureAlgorithmNames) {
 			return logical.ErrorResponse("unknown/unsupported signature algorithm, must be one of %s", AllowedSignatureAlgorithmNames), logical.ErrInvalidRequest
 		}
-		b.config.SignatureAlgorithm = jose.SignatureAlgorithm(newSignatureAlgorithmName)
+		config.SignatureAlgorithm = jose.SignatureAlgorithm(newSignatureAlgorithmName)
 	}
 
 	if newRawRSAKeyBits, ok := d.GetOk(keyRSAKeyBits); ok {
@@ -117,7 +119,7 @@ func (b *backend) pathConfigWrite(_ context.Context, _ *logical.Request, d *fram
 		if !intInSlice(newRSAKeyBits, AllowedRSAKeyBits) {
 			return logical.ErrorResponse("unsupported rsa_key_bits, must be one of %s", AllowedRSAKeyBits), logical.ErrInvalidRequest
 		}
-		b.config.RSAKeyBits = newRSAKeyBits
+		config.RSAKeyBits = newRSAKeyBits
 	}
 
 	if newRotationPeriod, ok := d.GetOk(keyRotationDuration); ok {
@@ -125,7 +127,7 @@ func (b *backend) pathConfigWrite(_ context.Context, _ *logical.Request, d *fram
 		if err != nil {
 			return nil, err
 		}
-		b.config.KeyRotationPeriod = duration
+		config.KeyRotationPeriod = duration
 
 		// Recalculate signing key expiration time
 
@@ -142,23 +144,23 @@ func (b *backend) pathConfigWrite(_ context.Context, _ *logical.Request, d *fram
 		if err != nil {
 			return nil, err
 		}
-		b.config.TokenTTL = duration
+		config.TokenTTL = duration
 	}
 
 	if newSetIat, ok := d.GetOk(keySetIAT); ok {
-		b.config.SetIAT = newSetIat.(bool)
+		config.SetIAT = newSetIat.(bool)
 	}
 
 	if newSetJTI, ok := d.GetOk(keySetJTI); ok {
-		b.config.SetJTI = newSetJTI.(bool)
+		config.SetJTI = newSetJTI.(bool)
 	}
 
 	if newSetNBF, ok := d.GetOk(keySetNBF); ok {
-		b.config.SetNBF = newSetNBF.(bool)
+		config.SetNBF = newSetNBF.(bool)
 	}
 
 	if newIssuer, ok := d.GetOk(keyIssuer); ok {
-		b.config.Issuer = newIssuer.(string)
+		config.Issuer = newIssuer.(string)
 	}
 
 	if newAudiencePattern, ok := d.GetOk(keyAudiencePattern); ok {
@@ -166,7 +168,7 @@ func (b *backend) pathConfigWrite(_ context.Context, _ *logical.Request, d *fram
 		if err != nil {
 			return nil, err
 		}
-		b.config.AudiencePattern = pattern
+		config.AudiencePattern = pattern
 	}
 
 	if newSubjectPattern, ok := d.GetOk(keySubjectPattern); ok {
@@ -174,11 +176,11 @@ func (b *backend) pathConfigWrite(_ context.Context, _ *logical.Request, d *fram
 		if err != nil {
 			return nil, err
 		}
-		b.config.SubjectPattern = pattern
+		config.SubjectPattern = pattern
 	}
 
 	if newMaxAudiences, ok := d.GetOk(keyMaxAllowedAudiences); ok {
-		b.config.MaxAudiences = newMaxAudiences.(int)
+		config.MaxAudiences = newMaxAudiences.(int)
 	}
 
 	if newAllowedClaims, ok := d.GetOk(keyAllowedClaims); ok {
@@ -190,33 +192,41 @@ func (b *backend) pathConfigWrite(_ context.Context, _ *logical.Request, d *fram
 			}
 		}
 
-		b.config.AllowedClaims = newAllowedClaims.([]string)
-		b.config.allowedClaimsMap = makeAllowedClaimsMap(newAllowedClaims.([]string))
+		config.AllowedClaims = newAllowedClaims.([]string)
+		config.allowedClaimsMap = makeAllowedClaimsMap(newAllowedClaims.([]string))
 	}
 
-	return nonLockingRead(b)
+	if err := b.saveConfig(ctx, req.Storage, config); err != nil {
+		return nil, err
+	}
+
+	return configResponse(config)
 }
 
-func (b *backend) pathConfigRead(_ context.Context, _ *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
-	b.configLock.RLock()
-	defer b.configLock.RUnlock()
+func (b *backend) pathConfigRead(ctx context.Context, req *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
+	config, err := b.getConfig(ctx, req.Storage)
+	if err != nil {
+		return nil, err
+	}
 
-	return nonLockingRead(b)
+	return configResponse(config)
 }
 
-func nonLockingRead(b *backend) (*logical.Response, error) {
+func configResponse(config *Config) (*logical.Response, error) {
 	return &logical.Response{
 		Data: map[string]interface{}{
-			keyRotationDuration:    b.config.KeyRotationPeriod.String(),
-			keyTokenTTL:            b.config.TokenTTL.String(),
-			keySetIAT:              b.config.SetIAT,
-			keySetJTI:              b.config.SetJTI,
-			keySetNBF:              b.config.SetNBF,
-			keyIssuer:              b.config.Issuer,
-			keyAudiencePattern:     b.config.AudiencePattern.String(),
-			keySubjectPattern:      b.config.SubjectPattern.String(),
-			keyMaxAllowedAudiences: b.config.MaxAudiences,
-			keyAllowedClaims:       b.config.AllowedClaims,
+			keySignatureAlgorithm:  config.SignatureAlgorithm,
+			keyRSAKeyBits:          config.RSAKeyBits,
+			keyRotationDuration:    config.KeyRotationPeriod.String(),
+			keyTokenTTL:            config.TokenTTL.String(),
+			keySetIAT:              config.SetIAT,
+			keySetJTI:              config.SetJTI,
+			keySetNBF:              config.SetNBF,
+			keyIssuer:              config.Issuer,
+			keyAudiencePattern:     config.AudiencePattern.String(),
+			keySubjectPattern:      config.SubjectPattern.String(),
+			keyMaxAllowedAudiences: config.MaxAudiences,
+			keyAllowedClaims:       config.AllowedClaims,
 		},
 	}, nil
 }
@@ -246,6 +256,8 @@ Configure the backend.
 const pathConfigHelpDesc = `
 Configure the backend.
 
+sig_alg:		  Signature algorithm used to sign new tokens.
+rsa_key_bits:	  Size of generate RSA keys, when using RSA signature algorithms.
 key_ttl:          Duration before a key stops signing new tokens and a new one is generated.
 		          After this period the public key will still be available to verify JWTs.
 jwt_ttl:          Duration before a token expires.

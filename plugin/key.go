@@ -1,12 +1,14 @@
 package jwtsecrets
 
 import (
+	"context"
 	"crypto"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/rsa"
 	"errors"
+	"github.com/hashicorp/vault/sdk/logical"
 	"time"
 
 	"gopkg.in/square/go-jose.v2"
@@ -36,13 +38,13 @@ type verificationKey struct {
 }
 
 // getKey will return a valid key is one is available, or otherwise generate a new one.
-func (b *backend) getKey() (*signingKey, error) {
+func (b *backend) getKey(ctx context.Context, stg logical.Storage) (*signingKey, error) {
 	key, err := b.getExistingKey()
 	if err == nil {
 		return key, nil
 	}
 
-	return b.getNewKey()
+	return b.getNewKey(ctx, stg)
 }
 
 func (b *backend) getExistingKey() (*signingKey, error) {
@@ -58,29 +60,19 @@ func (b *backend) getExistingKey() (*signingKey, error) {
 	return nil, errors.New("no valid key found")
 }
 
-func (b *backend) getNewKey() (*signingKey, error) {
+func (b *backend) getNewKey(ctx context.Context, stg logical.Storage) (*signingKey, error) {
+	config, err := b.getConfig(ctx, stg)
+	if err != nil {
+		return nil, err
+	}
+
 	b.keysLock.Lock()
 	defer b.keysLock.Unlock()
 
-	b.configLock.RLock()
-	config := b.config
-	b.configLock.RUnlock()
-
-	// Save signing key as verification key
-
-	if b.signingKey != nil {
-		newVerificationKey := &verificationKey{
-			ID:                 b.signingKey.ID,
-			PublicKey:          b.signingKey.PrivateKey.Public(),
-			SignatureAlgorithm: b.signingKey.SignatureAlgorithm,
-			KeepUntil:          b.signingKey.UseUntil.Add(config.TokenTTL).Add(keyPruneExtra),
-		}
-		b.verificationKeys = append(b.verificationKeys, newVerificationKey)
-	}
+	b.unlockedSaveSigningKeyAsVerificationKey(config)
 
 	// Generate new signing key
 
-	var err error
 	var privateKey AnyPrivateKey
 
 	switch config.SignatureAlgorithm {
@@ -120,13 +112,32 @@ func (b *backend) getNewKey() (*signingKey, error) {
 	return b.signingKey, nil
 }
 
-func (b *backend) pruneOldKeys() {
-	now := b.clock.now()
+func (b *backend) unlockedSaveSigningKeyAsVerificationKey(config *Config) {
+	if b.signingKey != nil {
+		newVerificationKey := &verificationKey{
+			ID:                 b.signingKey.ID,
+			PublicKey:          b.signingKey.PrivateKey.Public(),
+			SignatureAlgorithm: b.signingKey.SignatureAlgorithm,
+			KeepUntil:          b.signingKey.UseUntil.Add(config.TokenTTL).Add(keyPruneExtra),
+		}
+		b.verificationKeys = append(b.verificationKeys, newVerificationKey)
+		b.signingKey = nil
+	}
+}
 
-	_, _ = b.getKey()
+func (b *backend) pruneOldKeys(ctx context.Context, stg logical.Storage) {
+	now := b.clock.now()
 
 	b.keysLock.Lock()
 	defer b.keysLock.Unlock()
+
+	if b.signingKey != nil && b.signingKey.UseUntil.After(now) {
+		config, err := b.getConfig(ctx, stg)
+		if err != nil {
+			return
+		}
+		b.unlockedSaveSigningKeyAsVerificationKey(config)
+	}
 
 	n := 0
 	for _, k := range b.verificationKeys {
@@ -139,8 +150,8 @@ func (b *backend) pruneOldKeys() {
 }
 
 // GetPublicKeys returns a set of JSON Web Keys.
-func (b *backend) getPublicKeys() *jose.JSONWebKeySet {
-	b.pruneOldKeys()
+func (b *backend) getPublicKeys(ctx context.Context, stg logical.Storage) *jose.JSONWebKeySet {
+	b.pruneOldKeys(ctx, stg)
 
 	b.keysLock.RLock()
 	defer b.keysLock.RUnlock()

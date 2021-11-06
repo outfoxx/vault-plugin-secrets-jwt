@@ -1,10 +1,13 @@
 package jwtsecrets
 
 import (
-	"github.com/mariuszs/friendlyid-go/friendlyid"
+	"context"
+	"encoding/json"
+	"github.com/golang/protobuf/proto"
+	"github.com/hashicorp/vault/sdk/logical"
 	"gopkg.in/square/go-jose.v2"
+	"path"
 	"regexp"
-	"strings"
 	"time"
 )
 
@@ -17,7 +20,7 @@ const (
 	DefaultSetIAT             = true
 	DefaultSetJTI             = true
 	DefaultSetNBF             = true
-	DefaultIssuer             = "vault-plugin-secrets-jwt:UUID"
+	DefaultIssuer             = "vault-plugin-secrets-jwt"
 	DefaultAudiencePattern    = ".*"
 	DefaultSubjectPattern     = ".*"
 	DefaultMaxAudiences       = -1
@@ -34,6 +37,8 @@ var AllowedRSAKeyBits = []int{2048, 3072, 4096}
 
 // Config holds all configuration for the backend.
 type Config struct {
+	proto.Message
+
 	// SignatureAlgorithm is the signing algorithm to use.
 	SignatureAlgorithm jose.SignatureAlgorithm
 
@@ -75,17 +80,66 @@ type Config struct {
 	allowedClaimsMap map[string]bool
 }
 
-// DefaultConfig creates a new default configuration.
-func DefaultConfig(backendUUID string) *Config {
-
-	var backendId string
-	if id, err := friendlyid.Encode(backendUUID); err == nil {
-		backendId = id
-	} else {
-		backendId = backendUUID
+func (b *backend) getConfig(ctx context.Context, stg logical.Storage) (*Config, error) {
+	b.cachedConfigLock.RLock()
+	if b.cachedConfig != nil {
+		defer b.cachedConfigLock.RUnlock()
+		return &*b.cachedConfig, nil
 	}
 
-	c := new(Config)
+	b.cachedConfigLock.RUnlock()
+	b.cachedConfigLock.Lock()
+	defer b.cachedConfigLock.Unlock()
+
+	// Double check somebody else didn't already cache it
+	if b.cachedConfig != nil {
+		defer b.cachedConfigLock.RUnlock()
+		return &*b.cachedConfig, nil
+	}
+
+	// Attempt to load config from storage & cache
+
+	rawConfig, err := stg.Get(ctx, path.Join(b.storagePrefix, configPath))
+	if err != nil {
+		return nil, err
+	}
+
+	if rawConfig != nil {
+		// Found it, finish load from storage
+		conf := &Config{}
+		if err := json.Unmarshal(rawConfig.Value, conf); err != nil {
+			return nil, err
+		}
+		b.cachedConfig = conf
+	} else {
+		// Nothing found, initialize configuration to default and save
+		b.cachedConfig = DefaultConfig()
+		if err := b.saveConfig(ctx, stg, b.cachedConfig); err != nil {
+			return nil, err
+		}
+	}
+
+	return &*b.cachedConfig, nil
+}
+
+func (b *backend) saveConfig(ctx context.Context, stg logical.Storage, config *Config) error {
+	entry, err := logical.StorageEntryJSON(path.Join(b.storagePrefix, configPath), config)
+	if err != nil {
+		return err
+	}
+	if err := stg.Put(ctx, entry); err != nil {
+		return err
+	}
+	return nil
+}
+
+func (b *backend) clearConfig(ctx context.Context, stg logical.Storage) error {
+	return stg.Delete(ctx, path.Join(b.storagePrefix, configPath))
+}
+
+// DefaultConfig updates a configuration to the default.
+func DefaultConfig() *Config {
+	c := &Config{}
 	c.SignatureAlgorithm = DefaultSignatureAlgorithm
 	c.RSAKeyBits = DefaultRSAKeyBits
 	c.KeyRotationPeriod, _ = time.ParseDuration(DefaultKeyRotationPeriod)
@@ -93,7 +147,7 @@ func DefaultConfig(backendUUID string) *Config {
 	c.SetIAT = DefaultSetIAT
 	c.SetJTI = DefaultSetJTI
 	c.SetNBF = DefaultSetNBF
-	c.Issuer = strings.Replace(DefaultIssuer, "UUID", backendId, 1)
+	c.Issuer = DefaultIssuer
 	c.AudiencePattern = regexp.MustCompile(DefaultAudiencePattern)
 	c.SubjectPattern = regexp.MustCompile(DefaultSubjectPattern)
 	c.MaxAudiences = DefaultMaxAudiences
