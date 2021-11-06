@@ -42,7 +42,7 @@ ifeq (${TRAVIS_BRANCH},master)
 	@git config --global user.email "builds@travis-ci.com"
 	@git config --global user.name "Travis CI"
 	@git tag ${BUILD_VERSION} 
-	@git push https://${GH_TOKEN}@github.com/ian-fox/vault-plugin-secrets-jwt.git ${BUILD_VERSION} > /dev/null 2>&1 
+	@git push https://${GH_TOKEN}@github.com/outfoxx/vault-plugin-secrets-jwt.git ${BUILD_VERSION} > /dev/null 2>&1
 endif
 
 .PHONY: default bootstrap dev lint test functional fmt tag
