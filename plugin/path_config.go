@@ -2,6 +2,7 @@ package jwtsecrets
 
 import (
 	"context"
+	"fmt"
 	"gopkg.in/square/go-jose.v2"
 	"regexp"
 	"time"
@@ -81,17 +82,33 @@ Note: 'aud' and 'sub' should be in this list if you would like to set them.`,
 		},
 
 		Operations: map[logical.Operation]framework.OperationHandler{
-			logical.UpdateOperation: &framework.PathOperation{
-				Callback: b.pathConfigWrite,
-			},
 			logical.ReadOperation: &framework.PathOperation{
 				Callback: b.pathConfigRead,
 			},
+			logical.CreateOperation: &framework.PathOperation{
+				Callback: b.pathConfigWrite,
+			},
+			logical.UpdateOperation: &framework.PathOperation{
+				Callback: b.pathConfigWrite,
+			},
+			logical.DeleteOperation: &framework.PathOperation{
+				Callback: b.pathConfigDelete,
+			},
 		},
 
+		ExistenceCheck:  b.pathConfigExistenceCheck,
 		HelpSynopsis:    pathConfigHelpSyn,
 		HelpDescription: pathConfigHelpDesc,
 	}
+}
+
+func (b *backend) pathConfigExistenceCheck(ctx context.Context, req *logical.Request, _ *framework.FieldData) (bool, error) {
+	out, err := req.Storage.Get(ctx, req.Path)
+	if err != nil {
+		return false, fmt.Errorf("existence check failed: %w", err)
+	}
+
+	return out != nil, nil
 }
 
 func (b *backend) pathConfigWrite(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
@@ -210,6 +227,15 @@ func (b *backend) pathConfigRead(ctx context.Context, req *logical.Request, _ *f
 	}
 
 	return configResponse(config)
+}
+
+func (b *backend) pathConfigDelete(ctx context.Context, req *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
+	err := b.clearConfig(ctx, req.Storage)
+	if err != nil {
+		return nil, err
+	}
+
+	return nil, nil
 }
 
 func configResponse(config *Config) (*logical.Response, error) {

@@ -3,7 +3,6 @@ package jwtsecrets
 import (
 	"context"
 	"encoding/json"
-	"github.com/golang/protobuf/proto"
 	"github.com/hashicorp/vault/sdk/logical"
 	"gopkg.in/square/go-jose.v2"
 	"path"
@@ -37,8 +36,6 @@ var AllowedRSAKeyBits = []int{2048, 3072, 4096}
 
 // Config holds all configuration for the backend.
 type Config struct {
-	proto.Message
-
 	// SignatureAlgorithm is the signing algorithm to use.
 	SignatureAlgorithm jose.SignatureAlgorithm
 
@@ -144,7 +141,16 @@ func (b *backend) saveConfigUnlocked(ctx context.Context, stg logical.Storage, c
 }
 
 func (b *backend) clearConfig(ctx context.Context, stg logical.Storage) error {
-	return stg.Delete(ctx, path.Join(b.storagePrefix, configPath))
+	b.cachedConfigLock.Lock()
+	defer b.cachedConfigLock.Unlock()
+
+	if err := stg.Delete(ctx, path.Join(b.storagePrefix, configPath)); err != nil {
+		return err
+	}
+
+	b.cachedConfig = nil
+
+	return nil
 }
 
 // DefaultConfig updates a configuration to the default.
