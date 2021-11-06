@@ -66,6 +66,9 @@ func makeBackend(backendUUID string) (*backend, error) {
 				pathSign(b),
 			},
 		),
+		Secrets: []*framework.Secret{
+			b.token(),
+		},
 	}
 
 	return b, nil
