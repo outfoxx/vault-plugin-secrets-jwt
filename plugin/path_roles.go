@@ -62,6 +62,7 @@ func pathRole(b *backend) []*framework.Path {
 					Callback: b.pathRolesDelete,
 				},
 			},
+			ExistenceCheck: b.pathRoleExistenceCheck,
 			HelpSynopsis:    pathRoleHelpSyn,
 			HelpDescription: pathRoleHelpDesc,
 		},
@@ -76,6 +77,17 @@ func pathRole(b *backend) []*framework.Path {
 			HelpDescription: pathRoleListHelpDesc,
 		},
 	}
+}
+
+func (b *backend) pathRoleExistenceCheck(ctx context.Context, req *logical.Request, d *framework.FieldData) (bool, error) {
+	name := d.Get("name").(string)
+
+	role, err := req.Storage.Get(ctx, path.Join(keyStorageRolePath, name))
+	if err != nil {
+		return false, err
+	}
+
+	return role != nil, nil
 }
 
 // pathRolesList makes a request to Vault storage to retrieve a list of roles for the backend
