@@ -23,7 +23,6 @@ const (
 
 type backend struct {
 	*framework.Backend
-	storagePrefix    string
 	lockManager      *keysutil.LockManager
 	cachedConfig     *Config
 	cachedConfigLock *sync.RWMutex
@@ -33,7 +32,7 @@ type backend struct {
 
 // Factory returns a new backend as logical.Backend.
 func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend, error) {
-	b, err := createBackend(conf.BackendUUID)
+	b, err := createBackend()
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +42,7 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 	return b, nil
 }
 
-func createBackend(backendUUID string) (*backend, error) {
+func createBackend() (*backend, error) {
 	var b = backend{}
 
 	var err error
@@ -52,7 +51,6 @@ func createBackend(backendUUID string) (*backend, error) {
 		return nil, err
 	}
 
-	b.storagePrefix = backendUUID
 	b.cachedConfigLock = new(sync.RWMutex)
 	b.clock = realClock{}
 	b.idGen = friendlyIdGenerator{}

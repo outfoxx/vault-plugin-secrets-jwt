@@ -80,7 +80,7 @@ func pathRole(b *backend) []*framework.Path {
 
 // pathRolesList makes a request to Vault storage to retrieve a list of roles for the backend
 func (b *backend) pathRolesList(ctx context.Context, req *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
-	entries, err := req.Storage.List(ctx, path.Join(b.storagePrefix, keyStorageRolePath) + "/")
+	entries, err := req.Storage.List(ctx, keyStorageRolePath + "/")
 	if err != nil {
 		return nil, err
 	}
@@ -180,7 +180,7 @@ func (b *backend) pathRolesWrite(ctx context.Context, req *logical.Request, d *f
 
 // pathRolesDelete makes a request to Vault storage to delete a role
 func (b *backend) pathRolesDelete(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
-	err := req.Storage.Delete(ctx, path.Join(b.storagePrefix, keyStorageRolePath, d.Get(keyRoleName).(string)))
+	err := req.Storage.Delete(ctx, path.Join(keyStorageRolePath, d.Get(keyRoleName).(string)))
 	if err != nil {
 		return nil, fmt.Errorf("error deleting role: %w", err)
 	}
@@ -193,7 +193,7 @@ func (b *backend) getRole(ctx context.Context, stg logical.Storage, name string)
 		return nil, fmt.Errorf("missing role name")
 	}
 
-	entry, err := stg.Get(ctx, path.Join(b.storagePrefix, keyStorageRolePath, name))
+	entry, err := stg.Get(ctx, path.Join(keyStorageRolePath, name))
 	if err != nil {
 		return nil, err
 	}
@@ -212,7 +212,7 @@ func (b *backend) getRole(ctx context.Context, stg logical.Storage, name string)
 
 // setRole adds the role to the Vault storage API
 func (b *backend)setRole(ctx context.Context, stg logical.Storage, name string, roleEntry *jwtSecretsRoleEntry) error {
-	entry, err := logical.StorageEntryJSON(path.Join(b.storagePrefix, keyStorageRolePath, name), roleEntry)
+	entry, err := logical.StorageEntryJSON(path.Join(keyStorageRolePath, name), roleEntry)
 	if err != nil {
 		return err
 	}

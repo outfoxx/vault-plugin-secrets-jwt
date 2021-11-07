@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/vault/sdk/helper/keysutil"
 	"github.com/hashicorp/vault/sdk/logical"
 	"gopkg.in/square/go-jose.v2"
-	"path"
 	"regexp"
 	"time"
 )
@@ -98,7 +97,7 @@ func (b *backend) getConfig(ctx context.Context, stg logical.Storage) (*Config, 
 
 	// Attempt to load config from storage & cache
 
-	rawConfig, err := stg.Get(ctx, path.Join(b.storagePrefix, configPath))
+	rawConfig, err := stg.Get(ctx, configPath)
 	if err != nil {
 		return nil, err
 	}
@@ -186,7 +185,7 @@ func (b *backend) saveConfig(ctx context.Context, stg logical.Storage, config *C
 
 func (b *backend) saveConfigUnlocked(ctx context.Context, stg logical.Storage, config *Config) error {
 
-	entry, err := logical.StorageEntryJSON(path.Join(b.storagePrefix, configPath), config)
+	entry, err := logical.StorageEntryJSON(configPath, config)
 	if err != nil {
 		return err
 	}
@@ -203,7 +202,7 @@ func (b *backend) clearConfig(ctx context.Context, stg logical.Storage) error {
 	b.cachedConfigLock.Lock()
 	defer b.cachedConfigLock.Unlock()
 
-	if err := stg.Delete(ctx, path.Join(b.storagePrefix, configPath)); err != nil {
+	if err := stg.Delete(ctx, configPath); err != nil {
 		return err
 	}
 
