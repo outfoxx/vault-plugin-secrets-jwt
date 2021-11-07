@@ -84,13 +84,11 @@ func createBackend(conf *logical.BackendConfig) (*backend, error) {
 
 func (b *backend) initialize(ctx context.Context, req *logical.InitializationRequest) error {
 
-	defaultConfig := DefaultConfig(b.System())
-
-	if err := b.saveConfig(ctx, req.Storage, defaultConfig); err != nil {
+	if _, err := b.getConfig(ctx, req.Storage); err != nil {
 		return err
 	}
 
-	b.Logger().Debug("Default Config Initialized")
+	b.Logger().Debug("Initialized")
 
 	return nil
 }

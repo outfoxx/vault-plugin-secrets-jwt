@@ -115,6 +115,8 @@ func (b *backend) getConfig(ctx context.Context, stg logical.Storage) (*Config, 
 		if err := b.saveConfigUnlocked(ctx, stg, b.cachedConfig); err != nil {
 			return nil, err
 		}
+
+		b.Logger().Debug("Config Initialized")
 	}
 
 	return b.cachedConfig.copy(), nil
