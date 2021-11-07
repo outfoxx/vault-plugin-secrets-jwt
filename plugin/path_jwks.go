@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 	"gopkg.in/square/go-jose.v2"
-	"path"
 	"strconv"
 )
 
@@ -71,9 +70,8 @@ func (b *backend) getPublicKeys(ctx context.Context, stg logical.Storage) (*jose
 
 	keyIdx := 0
 	for version := policy.MinDecryptionVersion; version <= policy.LatestVersion; version++ {
-		versionStr := strconv.Itoa(version)
 
-		key, ok := policy.Keys[versionStr]
+		key, ok := policy.Keys[strconv.Itoa(version)]
 		if !ok {
 			continue
 		}
@@ -92,7 +90,7 @@ func (b *backend) getPublicKeys(ctx context.Context, stg logical.Storage) (*jose
 			jwkSet.Keys[keyIdx].Key = &key.RSAKey.PublicKey
 		}
 
-		jwkSet.Keys[keyIdx].KeyID = path.Join(policy.Name, versionStr)
+		jwkSet.Keys[keyIdx].KeyID = createKeyId(b.id, policy.Name, version)
 		jwkSet.Keys[keyIdx].Algorithm = string(config.SignatureAlgorithm)
 		jwkSet.Keys[keyIdx].Use = "sig"
 		keyIdx += 1

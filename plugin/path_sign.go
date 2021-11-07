@@ -129,6 +129,7 @@ func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *fr
 	}
 
 	signer := &PolicySigner{
+		BackendId:          b.id,
 		SignatureAlgorithm: config.SignatureAlgorithm,
 		Policy:             policy,
 		SignerOptions:      (&jose.SignerOptions{}).WithType("JWT"),

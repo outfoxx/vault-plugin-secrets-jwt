@@ -17,12 +17,13 @@ import (
 )
 
 const (
-	configPath = "config"
+	configPath  = "config"
 	mainKeyName = "main"
 )
 
 type backend struct {
 	*framework.Backend
+	id               string
 	lockManager      *keysutil.LockManager
 	cachedConfig     *Config
 	cachedConfigLock *sync.RWMutex
@@ -32,7 +33,7 @@ type backend struct {
 
 // Factory returns a new backend as logical.Backend.
 func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend, error) {
-	b, err := createBackend()
+	b, err := createBackend(conf)
 	if err != nil {
 		return nil, err
 	}
@@ -42,7 +43,7 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 	return b, nil
 }
 
-func createBackend() (*backend, error) {
+func createBackend(conf *logical.BackendConfig) (*backend, error) {
 	var b = backend{}
 
 	var err error
@@ -51,6 +52,7 @@ func createBackend() (*backend, error) {
 		return nil, err
 	}
 
+	b.id = conf.BackendUUID
 	b.cachedConfigLock = new(sync.RWMutex)
 	b.clock = realClock{}
 	b.idGen = friendlyIdGenerator{}
@@ -73,13 +75,13 @@ func createBackend() (*backend, error) {
 			b.token(),
 		},
 		InitializeFunc: b.initialize,
-		PeriodicFunc: b.periodic,
-		Clean: b.clean,
+		PeriodicFunc:   b.periodic,
+		Clean:          b.clean,
 	}
 	return &b, nil
 }
 
-func(b *backend) initialize(ctx context.Context, req *logical.InitializationRequest) error {
+func (b *backend) initialize(ctx context.Context, req *logical.InitializationRequest) error {
 
 	defaultConfig := DefaultConfig(b.System())
 

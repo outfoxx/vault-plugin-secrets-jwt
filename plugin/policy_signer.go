@@ -9,12 +9,11 @@ import (
 	"github.com/hashicorp/vault/sdk/helper/errutil"
 	"github.com/hashicorp/vault/sdk/helper/keysutil"
 	"gopkg.in/square/go-jose.v2"
-	"path"
-	"strconv"
 	"strings"
 )
 
 type PolicySigner struct {
+	BackendId          string
 	SignatureAlgorithm jose.SignatureAlgorithm
 	Policy             *keysutil.Policy
 	SignerOptions      *jose.SignerOptions
@@ -26,7 +25,7 @@ func (ps *PolicySigner) Sign(payload []byte) (*jose.JSONWebSignature, error) {
 	ps.Policy.Lock(false)
 	defer ps.Policy.Unlock()
 
-	kid := path.Join(ps.Policy.Name, strconv.Itoa(ps.Policy.LatestVersion))
+	kid := createKeyId(ps.BackendId, ps.Policy.Name, ps.Policy.LatestVersion)
 
 	protected := map[jose.HeaderKey]string{
 		"kid": kid,
@@ -52,8 +51,8 @@ func (ps *PolicySigner) Sign(payload []byte) (*jose.JSONWebSignature, error) {
 		return nil, err
 	}
 
-	encodedSignature, err := json.Marshal(map[string]interface{} {
-		"payload": base64.RawURLEncoding.EncodeToString(payload),
+	encodedSignature, err := json.Marshal(map[string]interface{}{
+		"payload":   base64.RawURLEncoding.EncodeToString(payload),
 		"protected": base64.RawURLEncoding.EncodeToString(serializedProtected),
 		"signatures": []map[string]interface{}{
 			{

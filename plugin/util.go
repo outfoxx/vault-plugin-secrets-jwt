@@ -1,6 +1,9 @@
 package jwtsecrets
 
 import (
+	"crypto"
+	"encoding/base64"
+	"path"
 	"strconv"
 	"time"
 
@@ -73,4 +76,14 @@ func durationMin(x time.Duration, y time.Duration) time.Duration {
 		return x
 	}
 	return y
+}
+
+func createKeyId(backendId string, policyName string, version int) string {
+
+	rawId := path.Join(backendId, policyName, strconv.Itoa(version))
+
+	hasher := crypto.SHA1.New()
+	hasher.Write([]byte(rawId))
+
+	return base64.RawURLEncoding.EncodeToString(hasher.Sum(nil))
 }

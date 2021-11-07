@@ -14,7 +14,7 @@ func getTestBackend(t *testing.T) (*backend, *logical.Storage) {
 	config.StorageView = new(logical.InmemStorage)
 	config.BackendUUID = uuid.New().String()
 
-	b, err := createBackend()
+	b, err := createBackend(config)
 	if err != nil {
 		t.Fatalf("unable to create backend: %v", err)
 	}
