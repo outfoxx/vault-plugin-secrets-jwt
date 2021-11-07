@@ -1,5 +1,6 @@
 EXTERNAL_TOOLS=\
-	github.com/golangci/golangci-lint
+	github.com/golangci/golangci-lint \
+	github.com/elastic/go-licenser
 GOFMT_FILES?=$$(find . -name '*.go')
 BUILD_VERSION ?= $(shell ./bump_version.sh)
 
@@ -19,7 +20,7 @@ dev:
 
 # Lint runs the linter. Not used in CI because linting is handled by golangci separately
 lint:
-	golangci-lint run ./...
+	golangci-lint run -E goheader ./...
 
 # test runs the unit tests and vets the code
 test:
