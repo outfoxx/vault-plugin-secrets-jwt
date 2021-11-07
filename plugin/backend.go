@@ -76,6 +76,7 @@ func createBackend(conf *logical.BackendConfig) (*backend, error) {
 		},
 		InitializeFunc: b.initialize,
 		PeriodicFunc:   b.periodic,
+		Invalidate:     b.invalidate,
 		Clean:          b.clean,
 	}
 	return &b, nil
@@ -107,6 +108,21 @@ func (b *backend) periodic(ctx context.Context, req *logical.Request) error {
 	}
 
 	return b.pruneKeyVersions(ctx, req.Storage, policy, config, req.MountPoint)
+}
+
+func (b *backend) invalidate(_ context.Context, key string) {
+	if b.Logger().IsDebug() {
+		b.Logger().Debug("invalidating key", "key", key)
+	}
+	switch {
+	case strings.HasPrefix(key, "policy/"):
+		name := strings.TrimPrefix(key, "policy/")
+		b.lockManager.InvalidatePolicy(name)
+	case strings.HasPrefix(key, configPath):
+		b.cachedConfigLock.Lock()
+		defer b.cachedConfigLock.Unlock()
+		b.cachedConfig = nil
+	}
 }
 
 func (b *backend) clean(_ context.Context) {
