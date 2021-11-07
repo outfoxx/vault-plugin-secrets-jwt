@@ -12,12 +12,12 @@ const (
 	keyStorageRolePath = "role"
 	keyRoleName        = "name"
 	keySubject         = "subject"
-	keyOtherClaims     = "other_claims"
+	keyOtherClaims     = "claims"
 )
 
 type jwtSecretsRoleEntry struct {
 	Subject     string                 `json:"subject"`
-	OtherClaims map[string]interface{} `json:"other_claims"`
+	OtherClaims map[string]interface{} `json:"claims"`
 }
 
 // Return response data for a role
@@ -154,7 +154,7 @@ func (b *backend) pathRolesWrite(ctx context.Context, req *logical.Request, d *f
 	}
 
 	if _, ok := roleEntry.OtherClaims["sub"]; ok {
-		return logical.ErrorResponse("'sub' claim cannot be present in other_claims"), logical.ErrInvalidRequest
+		return logical.ErrorResponse("'sub' claim cannot be present in `claims` field"), logical.ErrInvalidRequest
 	}
 
 	for otherClaim := range roleEntry.OtherClaims {

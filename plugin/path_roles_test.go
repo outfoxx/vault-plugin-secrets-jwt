@@ -11,8 +11,8 @@ import (
 
 func writeRole(b *backend, storage *logical.Storage, name string, subject string, otherClaims map[string]interface{}) error {
 	data := map[string]interface{}{
-		"subject":      subject,
-		"other_claims": otherClaims,
+		"subject": subject,
+		"claims":  otherClaims,
 	}
 
 	req := &logical.Request{
