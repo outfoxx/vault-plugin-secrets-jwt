@@ -3,24 +3,16 @@ package jwtsecrets
 import (
 	"context"
 	"github.com/google/uuid"
-	log "github.com/hashicorp/go-hclog"
-	"github.com/hashicorp/vault/sdk/helper/logging"
 	"github.com/hashicorp/vault/sdk/logical"
 	"testing"
 	"time"
 )
 
 func getTestBackend(t *testing.T) (*backend, *logical.Storage) {
-	sys := &logical.StaticSystemView{}
-	sys.DefaultLeaseTTLVal, _ = time.ParseDuration("5m0s")
-	sys.MaxLeaseTTLVal, _ = time.ParseDuration("30m0s")
 
-	config := &logical.BackendConfig{
-		Logger:      logging.NewVaultLogger(log.Trace),
-		System:      sys,
-		StorageView: &logical.InmemStorage{},
-		BackendUUID: uuid.New().String(),
-	}
+	config := logical.TestBackendConfig()
+	config.StorageView = new(logical.InmemStorage)
+	config.BackendUUID = uuid.New().String()
 
 	b, err := createBackend(config.BackendUUID)
 	if err != nil {
