@@ -145,15 +145,6 @@ func (b *backend) pathConfigWrite(ctx context.Context, req *logical.Request, d *
 			return nil, err
 		}
 		config.KeyRotationPeriod = duration
-
-		// Recalculate signing key expiration time
-
-		b.cachedKeysLock.Lock()
-		defer b.cachedKeysLock.Unlock()
-
-		if b.signingKey != nil {
-			b.signingKey.UseUntil = b.signingKey.Inception.Add(duration)
-		}
 	}
 
 	if newTTL, ok := d.GetOk(keyTokenTTL); ok {
@@ -211,6 +202,10 @@ func (b *backend) pathConfigWrite(ctx context.Context, req *logical.Request, d *
 
 		config.AllowedClaims = newAllowedClaims.([]string)
 		config.allowedClaimsMap = makeAllowedClaimsMap(newAllowedClaims.([]string))
+	}
+
+	if config.TokenTTL > b.System().MaxLeaseTTL() {
+		return logical.ErrorResponse("'%s' is greater that the max lease ttl", keyTokenTTL), logical.ErrInvalidRequest
 	}
 
 	if err := b.saveConfig(ctx, req.Storage, config); err != nil {

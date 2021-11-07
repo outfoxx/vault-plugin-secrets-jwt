@@ -60,3 +60,17 @@ func (f *fakeIDGenerator) id() (string, error) {
 	f.Counter++
 	return strconv.Itoa(f.Counter), nil
 }
+
+func intMax(x int, y int) int {
+	if x > y {
+		return x
+	}
+	return y
+}
+
+func durationMin(x time.Duration, y time.Duration) time.Duration {
+	if x < y {
+		return x
+	}
+	return y
+}

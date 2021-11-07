@@ -11,14 +11,21 @@ import (
 )
 
 func getTestBackend(t *testing.T) (*backend, *logical.Storage) {
+	sys := &logical.StaticSystemView{}
+	sys.DefaultLeaseTTLVal, _ = time.ParseDuration("5m0s")
+	sys.MaxLeaseTTLVal, _ = time.ParseDuration("30m0s")
+
 	config := &logical.BackendConfig{
 		Logger:      logging.NewVaultLogger(log.Trace),
-		System:      &logical.StaticSystemView{},
+		System:      sys,
 		StorageView: &logical.InmemStorage{},
-		BackendUUID: "test",
+		BackendUUID: uuid.New().String(),
 	}
 
-	b := createBackend(uuid.New().String())
+	b, err := createBackend(config.BackendUUID)
+	if err != nil {
+		t.Fatalf("unable to create backend: %v", err)
+	}
 	if err := b.Setup(context.Background(), config); err != nil {
 		t.Fatalf("unable to create backend: %v", err)
 	}

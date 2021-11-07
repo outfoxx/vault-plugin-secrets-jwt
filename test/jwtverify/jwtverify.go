@@ -42,13 +42,13 @@ func validateToken(rawToken, jwksEndpoint string) error {
 	}
 
 	defer resp.Body.Close()
-	body, err := ioutil.ReadAll(resp.Body)
+	jwksBody, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}
 
 	var jwks jose.JSONWebKeySet
-	if err = json.Unmarshal(body, &jwks); err != nil {
+	if err = json.Unmarshal(jwksBody, &jwks); err != nil {
 		return err
 	}
 
@@ -68,20 +68,21 @@ func validateToken(rawToken, jwksEndpoint string) error {
 	if len(matchingKeys) == 0 {
 		return fmt.Errorf("no matching keys for kid %s", kid)
 	}
-
-	cl := customToken{}
-	for _, key := range matchingKeys {
-		if err = tok.Claims(key.Key, &cl); err == nil {
-			jsonClaims, err := json.Marshal(cl)
-			if err != nil {
-				return fmt.Errorf("error serializing decoded claims: %v", err)
-			}
-
-			fmt.Printf("%s\n", jsonClaims)
-			return nil
-		}
-		fmt.Fprintln(os.Stderr, err)
+	if len(matchingKeys) > 1 {
+		return fmt.Errorf("multiple matching keys for kid %s\n%s", kid, jwksBody)
 	}
 
-	return errors.New("could not validate claims")
+	cl := customToken{}
+	if err = tok.Claims(matchingKeys[0].Key, &cl); err != nil {
+		return fmt.Errorf("%s\n%s\n%s", err, rawToken, jwksBody)
+	}
+
+	jsonClaims, err := json.Marshal(cl)
+	if err != nil {
+		return fmt.Errorf("error serializing decoded claims: %v", err)
+	}
+
+	fmt.Printf("%s\n", jsonClaims)
+
+	return nil
 }

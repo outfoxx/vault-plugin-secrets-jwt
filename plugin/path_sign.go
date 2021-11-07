@@ -2,7 +2,6 @@ package jwtsecrets
 
 import (
 	"context"
-
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
 	"gopkg.in/square/go-jose.v2"
@@ -25,6 +24,7 @@ func pathSign(b *backend) *framework.Path {
 			keyClaims: {
 				Type:        framework.TypeMap,
 				Description: `JSON claims set to sign.`,
+				Required:    false,
 			},
 		},
 		Operations: map[logical.Operation]framework.OperationHandler{
@@ -50,7 +50,7 @@ func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *fr
 
 	rawClaims, ok := d.GetOk(keyClaims)
 	if !ok {
-		return logical.ErrorResponse("no claims provided"), logical.ErrInvalidRequest
+		rawClaims = map[string]interface{}{}
 	}
 
 	claims, ok := rawClaims.(map[string]interface{})
@@ -123,17 +123,18 @@ func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *fr
 		}
 	}
 
-	key, err := b.getKey(ctx, req.Storage)
+	policy, err := b.getPolicy(ctx, req.Storage, config)
 	if err != nil {
 		return logical.ErrorResponse("error getting key: %v", err), err
 	}
 
-	sig, err := jose.NewSigner(jose.SigningKey{Algorithm: config.SignatureAlgorithm, Key: key.PrivateKey}, (&jose.SignerOptions{}).WithType("JWT").WithHeader("kid", key.ID))
-	if err != nil {
-		return logical.ErrorResponse("error signing claims: %v", err), err
+	signer := &PolicySigner{
+		SignatureAlgorithm: config.SignatureAlgorithm,
+		Policy:             policy,
+		SignerOptions:      (&jose.SignerOptions{}).WithType("JWT"),
 	}
 
-	token, err := jwt.Signed(sig).Claims(claims).CompactSerialize()
+	token, err := jwt.Signed(signer).Claims(claims).CompactSerialize()
 	if err != nil {
 		return logical.ErrorResponse("error serializing jwt: %v", err), err
 	}

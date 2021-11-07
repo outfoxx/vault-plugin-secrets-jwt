@@ -2,7 +2,10 @@ package jwtsecrets
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
+	"github.com/hashicorp/vault/sdk/helper/errutil"
+	"github.com/hashicorp/vault/sdk/helper/keysutil"
 	"github.com/hashicorp/vault/sdk/logical"
 	"gopkg.in/square/go-jose.v2"
 	"path"
@@ -14,8 +17,8 @@ import (
 const (
 	DefaultSignatureAlgorithm = jose.ES256
 	DefaultRSAKeyBits         = 2048
-	DefaultKeyRotationPeriod  = "15m0s"
-	DefaultTokenTTL           = "5m0s"
+	DefaultKeyRotationPeriod  = "2h0m0s"
+	DefaultTokenTTL           = "3m0s"
 	DefaultSetIAT             = true
 	DefaultSetJTI             = true
 	DefaultSetNBF             = true
@@ -81,7 +84,7 @@ func (b *backend) getConfig(ctx context.Context, stg logical.Storage) (*Config, 
 	b.cachedConfigLock.RLock()
 	if b.cachedConfig != nil {
 		defer b.cachedConfigLock.RUnlock()
-		return &*b.cachedConfig, nil
+		return b.cachedConfig.copy(), nil
 	}
 
 	b.cachedConfigLock.RUnlock()
@@ -90,7 +93,7 @@ func (b *backend) getConfig(ctx context.Context, stg logical.Storage) (*Config, 
 
 	// Double check somebody else didn't already cache it
 	if b.cachedConfig != nil {
-		return &*b.cachedConfig, nil
+		return b.cachedConfig.copy(), nil
 	}
 
 	// Attempt to load config from storage & cache
@@ -109,20 +112,76 @@ func (b *backend) getConfig(ctx context.Context, stg logical.Storage) (*Config, 
 		b.cachedConfig = conf
 	} else {
 		// Nothing found, initialize configuration to default and save
-		b.cachedConfig = DefaultConfig()
+		b.cachedConfig = DefaultConfig(b.System())
 		if err := b.saveConfigUnlocked(ctx, stg, b.cachedConfig); err != nil {
 			return nil, err
 		}
 	}
 
-	return &*b.cachedConfig, nil
+	return b.cachedConfig.copy(), nil
+}
+
+func (c *Config) copy() *Config {
+	cc := *c
+	return &cc
 }
 
 func (b *backend) saveConfig(ctx context.Context, stg logical.Storage, config *Config) error {
 	b.cachedConfigLock.Lock()
 	defer b.cachedConfigLock.Unlock()
 
-	return b.saveConfigUnlocked(ctx, stg, config)
+	keyFormatChanged :=
+		b.cachedConfig != nil &&
+			(config.SignatureAlgorithm != b.cachedConfig.SignatureAlgorithm ||
+				config.RSAKeyBits != b.cachedConfig.RSAKeyBits)
+
+	if err := b.saveConfigUnlocked(ctx, stg, config); err != nil {
+		return err
+	}
+
+	if !keyFormatChanged {
+		return nil
+	}
+
+	b.Logger().Info("Key Format Rotation")
+
+	policy, err := b.getPolicy(ctx, stg, config)
+	if err != nil {
+		return err
+	}
+
+	policy.Lock(true)
+	defer policy.Unlock()
+
+	switch config.SignatureAlgorithm {
+	case jose.RS256, jose.RS384, jose.RS512:
+		switch config.RSAKeyBits {
+		case 2048:
+			policy.Type = keysutil.KeyType_RSA2048
+		case 3072:
+			policy.Type = keysutil.KeyType_RSA3072
+		case 4096:
+			policy.Type = keysutil.KeyType_RSA4096
+		default:
+			err = errutil.InternalError{Err: "unsupported RSA key size"}
+		}
+	case jose.ES256:
+		policy.Type = keysutil.KeyType_ECDSA_P256
+	case jose.ES384:
+		policy.Type = keysutil.KeyType_ECDSA_P384
+	case jose.ES512:
+		policy.Type = keysutil.KeyType_ECDSA_P521
+	default:
+		err = errutil.InternalError{Err: "unknown/unsupported signature algorithm"}
+	}
+
+	if err != nil {
+		return nil
+	}
+
+	defer b.lockManager.InvalidatePolicy(mainKeyName)
+
+	return policy.Rotate(ctx, stg, rand.Reader)
 }
 
 func (b *backend) saveConfigUnlocked(ctx context.Context, stg logical.Storage, config *Config) error {
@@ -154,12 +213,15 @@ func (b *backend) clearConfig(ctx context.Context, stg logical.Storage) error {
 }
 
 // DefaultConfig updates a configuration to the default.
-func DefaultConfig() *Config {
+func DefaultConfig(sys logical.SystemView) *Config {
+	defaultKeyRotationPeriod, _ := time.ParseDuration(DefaultKeyRotationPeriod)
+	defaultTokenTTL, _ := time.ParseDuration(DefaultTokenTTL)
+
 	c := &Config{}
 	c.SignatureAlgorithm = DefaultSignatureAlgorithm
 	c.RSAKeyBits = DefaultRSAKeyBits
-	c.KeyRotationPeriod, _ = time.ParseDuration(DefaultKeyRotationPeriod)
-	c.TokenTTL, _ = time.ParseDuration(DefaultTokenTTL)
+	c.KeyRotationPeriod = defaultKeyRotationPeriod
+	c.TokenTTL = durationMin(defaultTokenTTL, sys.DefaultLeaseTTL())
 	c.SetIAT = DefaultSetIAT
 	c.SetJTI = DefaultSetJTI
 	c.SetNBF = DefaultSetNBF

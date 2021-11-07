@@ -41,7 +41,24 @@ func getSignedToken(b *backend, storage *logical.Storage, role string, claims ma
 		return fmt.Errorf("error parsing jwt: %s", err)
 	}
 
-	if err = token.Claims(b.signingKey.PrivateKey.Public(), dest); err != nil {
+	publicKeys, err := FetchJWKS(b, storage)
+	if err != nil {
+		return fmt.Errorf("error retrieving public keys: %s", err)
+	}
+
+	matchingPublicKeys := publicKeys.Key(token.Headers[0].KeyID)
+	if len(matchingPublicKeys) != 1 {
+		return fmt.Errorf("error locating unique public keys: %s", err)
+	}
+
+	var target interface{}
+	if dest != nil {
+		target = dest
+	} else {
+		target = &jwt.Claims{}
+	}
+
+	if err = token.Claims(matchingPublicKeys[0], target); err != nil {
 		return fmt.Errorf("error decoding claims: %s", err)
 	}
 
@@ -66,7 +83,7 @@ func TestSign(t *testing.T) {
 		t.Fatalf("%v\n", err)
 	}
 
-	expectedExpiry := jwt.NumericDate(5 * 60)
+	expectedExpiry := jwt.NumericDate(3 * 60)
 	expectedIssuedAt := jwt.NumericDate(0)
 	expectedNotBefore := jwt.NumericDate(0)
 	expectedClaims := jwt.Claims{

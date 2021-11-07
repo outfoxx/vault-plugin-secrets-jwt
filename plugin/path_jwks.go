@@ -2,9 +2,14 @@ package jwtsecrets
 
 import (
 	"context"
+	"crypto/x509"
 	"encoding/json"
+	"encoding/pem"
 	"github.com/hashicorp/vault/sdk/framework"
 	"github.com/hashicorp/vault/sdk/logical"
+	"gopkg.in/square/go-jose.v2"
+	"path"
+	"strconv"
 )
 
 func pathJwks(b *backend) *framework.Path {
@@ -40,6 +45,60 @@ func (b *backend) pathJwksRead(ctx context.Context, req *logical.Request, _ *fra
 			logical.HTTPRawBody:     jwkSetJson,
 		},
 	}, nil
+}
+
+// GetPublicKeys returns a set of JSON Web Keys.
+func (b *backend) getPublicKeys(ctx context.Context, stg logical.Storage) (*jose.JSONWebKeySet, error) {
+
+	config, err := b.getConfig(ctx, stg)
+	if err != nil {
+		return nil, err
+	}
+
+	policy, err := b.getPolicy(ctx, stg, config)
+	if err != nil {
+		return nil, err
+	}
+
+	policy.Lock(false)
+	defer policy.Unlock()
+
+	keyCount := (policy.LatestVersion - policy.MinDecryptionVersion) + 1
+
+	jwkSet := jose.JSONWebKeySet{
+		Keys: make([]jose.JSONWebKey, keyCount),
+	}
+
+	keyIdx := 0
+	for version := policy.MinDecryptionVersion; version <= policy.LatestVersion; version++ {
+		versionStr := strconv.Itoa(version)
+
+		key, ok := policy.Keys[versionStr]
+		if !ok {
+			continue
+		}
+
+		if key.FormattedPublicKey != "" {
+			block, _ := pem.Decode([]byte(key.FormattedPublicKey))
+			if block == nil {
+				continue
+			}
+
+			jwkSet.Keys[keyIdx].Key, err = x509.ParsePKIXPublicKey(block.Bytes)
+			if err != nil {
+				continue
+			}
+		} else if key.RSAKey != nil {
+			jwkSet.Keys[keyIdx].Key = &key.RSAKey.PublicKey
+		}
+
+		jwkSet.Keys[keyIdx].KeyID = path.Join(policy.Name, versionStr)
+		jwkSet.Keys[keyIdx].Algorithm = string(config.SignatureAlgorithm)
+		jwkSet.Keys[keyIdx].Use = "sig"
+		keyIdx += 1
+	}
+
+	return &jwkSet, nil
 }
 
 const pathJwksHelpSyn = `

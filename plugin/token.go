@@ -1,15 +1,14 @@
 package jwtsecrets
 
-import "github.com/hashicorp/vault/sdk/framework"
+import (
+	"context"
+	"github.com/hashicorp/vault/sdk/framework"
+	"github.com/hashicorp/vault/sdk/logical"
+)
 
 const (
 	jwtSecretsTokenType = "jwt_token"
 )
-
-type jwtSecretsToken struct {
-	ID    string `json:"id"`
-	Value string `json:"value"`
-}
 
 func (b *backend) token() *framework.Secret {
 	return &framework.Secret{
@@ -20,5 +19,11 @@ func (b *backend) token() *framework.Secret {
 				Description: "Signed JWT",
 			},
 		},
+		Revoke: tokenRevoke,
 	}
+}
+
+func tokenRevoke(_ context.Context, _ *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
+	// Nothing to do!
+	return nil, nil
 }

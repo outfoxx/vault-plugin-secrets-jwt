@@ -46,7 +46,7 @@ vault plugin register -sha256 $SHASUM vault-plugin-secrets-jwt
 vault secrets enable -path=jwt vault-plugin-secrets-jwt
 
 # Change the expiry time and make a pattern to check subjects against
-vault write jwt/config "key_ttl=2s" "jwt_ttl=1s" "subject_pattern=^[A-Z][a-z]+ [A-Z][a-z]+$"
+vault write jwt/config "key_ttl=3s" "jwt_ttl=3s" "subject_pattern=^[A-Z][a-z]+ [A-Z][a-z]+$"
 
 # Try to create a token before role is created
 if vault write -field=token jwt/sign/test @claims.json; then
@@ -76,7 +76,7 @@ expect_match "$(cat decoded.txt | jq '.nbf')" "[0-9]+" "Invalid 'nbf' claim"
 
 EXP_TIME=$(cat decoded.txt | jq '.exp')
 IAT_TIME=$(cat decoded.txt | jq '.iat')
-if [[ "(( EXP_TIME - IAT_TIME ))" -ne 1 ]]; then
+if [[ "(( EXP_TIME - IAT_TIME ))" -ne 3 ]]; then
     echo "times don't match"
     exit 1
 fi
@@ -88,16 +88,11 @@ vault write jwt/config "sig_alg=RS256"
 sleep 3
 vault write jwt/config "set_iat=false"
 vault write -field=token jwt/sign/test @claims.json > jwt2.txt
-sleep 4
 
 # We should be able to verify the second JWT, but not the first.
 jwtverify "$(cat jwt2.txt)" $VAULT_ADDR/v1/jwt/jwks | tee decoded2.txt
-if ! jwtverify "$(cat jwt1.txt)" $VAULT_ADDR/v1/jwt/jwks; then
-    echo "Key rotated successfully."
-else
-    echo "Key rotation failed, first JWT still valid."
-    exit 1
-fi
+
+expect_not_equal "$(wget -qO- $VAULT_ADDR/v1/jwt/jwks | jq '.keys | length')" "1" "Key Not Rotated"
 
 # Second key should not have an iat claim
 expect_no_match "$(cat decoded2.txt)" "iat" "should not have 'iat' claim"
@@ -119,6 +114,8 @@ fi
 
 # Allow 'foo' claim and check foo is now allowed.
 vault write -field=allowed_claims jwt/config @allowed_claims.json
+echo ""
+
 vault write -field=token jwt/sign/test @claims_foo.json > jwt3.txt
 jwtverify "$(cat jwt3.txt)" $VAULT_ADDR/v1/jwt/jwks | tee decoded3.txt
 expect_equal "$(cat decoded3.txt | jq '.foo')" '"bar"' "jwt should have 'foo' field set"
