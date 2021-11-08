@@ -139,7 +139,7 @@ vault write jwt/config key_ttl=12h0s
 ```
 
 When keys are rotated the previous keys are kept to allow verification. Verification keys
-are pruned by at a time after which all generated tokens have expired.
+are pruned at a time after which all generated tokens have expired.
 
 ### 🔸 Token TTL
 
@@ -176,25 +176,25 @@ The issuer (`iss`) claim for generated tokens can be specified in the configurat
 default, no issuer claim is added.
 
 ```bash
-vault write jwt/config issuer
+vault write jwt/config issuer=vault.example.com
 ```
 
 The "unique token id" (`jti`) claim can be enabled/disabled. By default, a "unique token id" claim is added.
 
 ```bash
-vault write jwt/config set_jti
+vault write jwt/config set_jti=true
 ```
 
 The "not before" (`nbf`) claim can be enabled/disabled. By default, a "not before" claim is added.
 
 ```bash
-vault write jwt/config set_nbf
+vault write jwt/config set_nbf=true
 ```
 
 The "issued at" (`iat`) claim can be enabled/disabled. By default, an "issued at" claim is added.
 
 ```bash
-vault write jwt/config set_iat
+vault write jwt/config set_iat=true
 ```
 
 ## Roles
@@ -230,14 +230,14 @@ providing the role name.
 
 Sign a JWT with default configured claims.
 ```bash
-vault write jwt/sign/my-role
+vault write -f jwt/sign/test-role
 ```
 
 Additionally, when signing a JWT, any claims allowed by the `allowed_claims` configuration and
 can be specified.
 
 ```bash
-echo claims '{"claims": {"groups":"test-group"}}' | vault write jwt/sign/my-role -
+echo claims '{"claims": {"groups":"test-group"}}' | vault write jwt/sign/test-role -
 ```
 
 ⚠️ If a claim value has been specified in the role's `claims` field, it cannot
