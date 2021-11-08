@@ -74,10 +74,10 @@ vault plugin register -sha256=$PLUGIN_SHA -command=vault-plugin-secrets-jwt secr
 vault secrets enable jwt
 ```
 
-3. Create a role specifying the subject (`sub`) claim of generated JWTs
+3. Create a role specifying the issuer (`iss`) claim of generated JWTs
 
 ```bash
-vault write jwt/roles/test-role subject=test.example.com
+vault write jwt/roles/test-role issuer=test.example.com
 ```
     
 4. Sign a JWT (with default claims)
@@ -201,13 +201,13 @@ vault write jwt/config set_iat=true
 
 Before signing a JWT a role must be configured.
 
-### 🔸 Subject
+### 🔸 Issuer
 
-When creating a role a `subject` must be provided. The role subject becomes the subject (`sub`)
-claim for signed JWTs. This is the only method of providing the subject claim for JWTs.
+When creating a role a value for the `issuer` field must be provided. The role issuer field specifies the
+issuer (`iss`) claim for signed JWTs. This is the only method of providing the issuer claim for JWTs.
 
 ```bash
-vault write jwt/roles/test-role subject=test.example.com
+vault write jwt/roles/test-role issuer=test.example.com
 ```
 
 ### 🔸 Other Claims
@@ -222,6 +222,20 @@ echo claims '{"claims": {"groups":"test-group"}}' | vault write jwt/roles/test-r
 
 ℹ️ Any claims set in a role's `claims` field must be explicitly allowed in the
 plugin's configuration and can no longer be set during a sign request.
+
+### 🔸 Audience & Subject Restrictions
+
+The role can be configured to restrict the audience (`aud`) and subject (`sub`) claims to
+those matching a specific pattern; this restriction is in addition to the pattern restrictions
+defined in the configuration. By default, both claims are unrestricted.
+
+```bash
+vault write jwt/config subject_pattern=*.example.com
+```
+
+```bash
+vault write jwt/config audience_pattern=*.example.com
+```
 
 ## Signing
 

@@ -54,14 +54,14 @@ if vault write -field=token jwt/sign/test @claims.json; then
     exit 1
 fi
 
-# Try to create a role with a subject that doesn't match configured subject_pattern
-if vault write jwt/roles/test "subject=invalid.subject"; then
-    echo "Creating a role that doesn't match subject pattern incorrectly succeeded."
+# Try to create a role with a disallowed claim value
+if  vault write jwt/roles/test @claims_foo.json; then
+    echo "Creating a role with a disallowed claim value incorrectly succeeded."
     exit 1
 fi
 
 # Add a role
-vault write jwt/roles/test subject="Zapp Brannigan"
+vault write jwt/roles/test issuer="DOOP"
 vault read jwt/roles/test
 
 # Create a token
@@ -89,9 +89,10 @@ sleep 3
 vault write jwt/config "set_iat=false"
 vault write -field=token jwt/sign/test @claims.json > jwt2.txt
 
-# We should be able to verify the second JWT, but not the first.
+# Verify the second JWT.
 jwtverify "$(cat jwt2.txt)" $VAULT_ADDR/v1/jwt/jwks | tee decoded2.txt
 
+# Check that key rotation happened
 expect_not_equal "$(wget -qO- $VAULT_ADDR/v1/jwt/jwks | jq '.keys | length')" "1" "Key Not Rotated"
 
 # Second key should not have an iat claim
@@ -100,9 +101,9 @@ expect_no_match "$(cat decoded2.txt)" "iat" "should not have 'iat' claim"
 # Tokens should have different unique ids.
 expect_not_equal "$(cat decoded.txt | jq '.jti')" "$(cat decoded2.txt | jq '.jti')" "JTI claims should differ"
 
-# Try to write a claim that has a reserved claim
-if vault write -field=token jwt/sign/test @reserved_claims.json; then
-    echo "Writing a set of claims which contains a reserved claim."
+# Try to write a claim that has an invalid value
+if vault write -field=token jwt/sign/test @invalid_claims.json; then
+    echo "Writing an invalid subject claim incorrectly succeeded."
     exit 1
 fi
 
@@ -114,8 +115,8 @@ fi
 
 # Allow 'foo' claim and check foo is now allowed.
 vault write -field=allowed_claims jwt/config @allowed_claims.json
-echo ""
-
 vault write -field=token jwt/sign/test @claims_foo.json > jwt3.txt
 jwtverify "$(cat jwt3.txt)" $VAULT_ADDR/v1/jwt/jwks | tee decoded3.txt
+cat decoded3.text
+echo ""
 expect_equal "$(cat decoded3.txt | jq '.foo')" '"bar"' "jwt should have 'foo' field set"

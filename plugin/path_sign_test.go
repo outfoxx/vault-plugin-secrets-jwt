@@ -108,8 +108,7 @@ func TestSign(t *testing.T) {
 		IssuedAt:  &expectedIssuedAt,
 		NotBefore: &expectedNotBefore,
 		ID:        "1",
-		Issuer:    DefaultIssuer,
-		Subject:   role + ".example.com",
+		Issuer:    role + ".example.com",
 	}
 
 	if diff := deep.Equal(expectedClaims, decoded); diff != nil {

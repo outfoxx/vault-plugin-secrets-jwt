@@ -25,10 +25,10 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
-func writeRole(b *backend, storage *logical.Storage, name string, subject string, otherClaims map[string]interface{}) error {
+func writeRole(b *backend, storage *logical.Storage, name string, issuer string, claims map[string]interface{}) error {
 	data := map[string]interface{}{
-		"subject": subject,
-		"claims":  otherClaims,
+		"issuer": issuer,
+		"claims": claims,
 	}
 
 	req := &logical.Request{
@@ -77,31 +77,31 @@ func TestCreate(t *testing.T) {
 		t.Fatalf("%v\n", err)
 	}
 
-	subject := resp.Data[keySubject].(string)
+	subject := resp.Data[keyIssuer].(string)
 	if diff := deep.Equal(role+".example.com", subject); diff != nil {
 		t.Error("failed to update subject:", diff)
 	}
 
 }
 
-func TestCreateRestrictedSubject(t *testing.T) {
+func TestCreateRestrictedAudience(t *testing.T) {
 	b, storage := getTestBackend(t)
 
 	role := "tester"
 
 	resp, err := writeConfig(b, storage, map[string]interface{}{
-		keySubjectPattern: "[a-z]+\\.[a-z]+\\.[a-z]+",
+		keyAudiencePattern: "[a-z]+\\.[a-z]+\\.[a-z]+",
 	})
 	if err != nil {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	err = writeRole(b, storage, role, "invalid role", map[string]interface{}{})
+	err = writeRole(b, storage, role, role+".example.com", map[string]interface{}{"aud": "invalid audience"})
 	if err == nil {
-		t.Fatalf("create role with non-matching subject pattern succeeded")
+		t.Fatalf("create role with non-matching audience pattern succeeded")
 	}
 
-	err = writeRole(b, storage, role, role+".example.com", map[string]interface{}{})
+	err = writeRole(b, storage, role, role+".example.com", map[string]interface{}{"aud": "audience.example.com"})
 	if err != nil {
 		t.Fatalf("%s\n", err)
 	}
@@ -111,9 +111,17 @@ func TestCreateRestrictedSubject(t *testing.T) {
 		t.Fatalf("%v\n", err)
 	}
 
-	subject := resp.Data[keySubject].(string)
-	if diff := deep.Equal(role+".example.com", subject); diff != nil {
-		t.Error("failed to update subject:", diff)
+	claims, ok := resp.Data[keyClaims].(map[string]interface{})
+	if !ok {
+		t.Error("failed to read response claims")
+	}
+
+	audience, ok := claims["aud"]
+	if !ok {
+		t.Error("no audience claim found")
+	}
+	if diff := deep.Equal("audience.example.com", audience); diff != nil {
+		t.Error("failed to update audience:", diff)
 	}
 
 }

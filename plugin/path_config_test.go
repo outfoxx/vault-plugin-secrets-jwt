@@ -18,6 +18,7 @@ package jwtsecrets
 
 import (
 	"context"
+	"gopkg.in/square/go-jose.v2"
 	"testing"
 
 	"github.com/go-test/deep"
@@ -25,10 +26,10 @@ import (
 )
 
 const (
+	updateRSAKeyBits            = 4096
 	updatedRotationPeriod       = "5m0s"
 	secondUpdatedRotationPeriod = "1h0m0s"
 	updatedTTL                  = "6m0s"
-	newIssuer                   = "new-vault"
 )
 
 func writeConfig(b *backend, storage *logical.Storage, config map[string]interface{}) (*logical.Response, error) {
@@ -86,12 +87,21 @@ func TestWriteConfig(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
+	sigAlg := resp.Data[keySignatureAlgorithm].(jose.SignatureAlgorithm)
+	rsaKeyBits := resp.Data[keyRSAKeyBits].(int)
 	rotationPeriod := resp.Data[keyRotationDuration].(string)
 	tokenTTL := resp.Data[keyTokenTTL].(string)
 	setIAT := resp.Data[keySetIAT].(bool)
 	setJTI := resp.Data[keySetJTI].(bool)
 	setNBF := resp.Data[keySetNBF].(bool)
-	issuer := resp.Data[keyIssuer].(string)
+
+	if diff := deep.Equal(DefaultSignatureAlgorithm, sigAlg); diff != nil {
+		t.Error("signature algorithm should be unchanged:", diff)
+	}
+
+	if diff := deep.Equal(DefaultRSAKeyBits, rsaKeyBits); diff != nil {
+		t.Error("rsa key bits should be unchanged:", diff)
+	}
 
 	if diff := deep.Equal(updatedRotationPeriod, rotationPeriod); diff != nil {
 		t.Error("failed to update rotation period:", diff)
@@ -113,28 +123,33 @@ func TestWriteConfig(t *testing.T) {
 		t.Error("set_nbf should be unchanged:", diff)
 	}
 
-	if diff := deep.Equal(DefaultIssuer, issuer); diff != nil {
-		t.Error("unexpected issuer:", diff)
-	}
-
 	resp, err = writeConfig(b, storage, map[string]interface{}{
-		keyRotationDuration: secondUpdatedRotationPeriod,
-		keyTokenTTL:         updatedTTL,
-		keySetIAT:           false,
-		keySetJTI:           false,
-		keySetNBF:           false,
-		keyIssuer:           newIssuer,
+		keyRSAKeyBits:         updateRSAKeyBits,
+		keyRotationDuration:   secondUpdatedRotationPeriod,
+		keyTokenTTL:           updatedTTL,
+		keySetIAT:             false,
+		keySetJTI:             false,
+		keySetNBF:             false,
 	})
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
+	sigAlg = resp.Data[keySignatureAlgorithm].(jose.SignatureAlgorithm)
+	rsaKeyBits = resp.Data[keyRSAKeyBits].(int)
 	rotationPeriod = resp.Data[keyRotationDuration].(string)
 	tokenTTL = resp.Data[keyTokenTTL].(string)
 	setIAT = resp.Data[keySetIAT].(bool)
 	setJTI = resp.Data[keySetJTI].(bool)
 	setNBF = resp.Data[keySetNBF].(bool)
-	issuer = resp.Data[keyIssuer].(string)
+
+	if diff := deep.Equal(DefaultSignatureAlgorithm, sigAlg); diff != nil {
+		t.Error("signature algorithm should be unchanged:", diff)
+	}
+
+	if diff := deep.Equal(updateRSAKeyBits, rsaKeyBits); diff != nil {
+		t.Error("failed to update rsa key bits:", diff)
+	}
 
 	if diff := deep.Equal(secondUpdatedRotationPeriod, rotationPeriod); diff != nil {
 		t.Error("failed to update rotation period:", diff)
@@ -154,10 +169,6 @@ func TestWriteConfig(t *testing.T) {
 
 	if diff := deep.Equal(false, setNBF); diff != nil {
 		t.Error("expected set_nbf to be false")
-	}
-
-	if diff := deep.Equal(newIssuer, issuer); diff != nil {
-		t.Error("unexpected issuer:", diff)
 	}
 }
 
@@ -179,7 +190,7 @@ func TestWriteInvalidConfig(t *testing.T) {
 	}
 
 	resp, err = writeConfig(b, storage, map[string]interface{}{
-		keyAllowedClaims: []string{"sub"},
+		keyAllowedClaims: []string{"iss"},
 	})
 	if err == nil {
 		t.Errorf("Should have errored but got response: %#v", resp)

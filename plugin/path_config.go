@@ -34,7 +34,6 @@ const (
 	keySetIAT              = "set_iat"
 	keySetJTI              = "set_jti"
 	keySetNBF              = "set_nbf"
-	keyIssuer              = "issuer"
 	keyAudiencePattern     = "audience_pattern"
 	keySubjectPattern      = "subject_pattern"
 	keyMaxAllowedAudiences = "max_audiences"
@@ -182,10 +181,6 @@ func (b *backend) pathConfigWrite(ctx context.Context, req *logical.Request, d *
 		config.SetNBF = newSetNBF.(bool)
 	}
 
-	if newIssuer, ok := d.GetOk(keyIssuer); ok {
-		config.Issuer = newIssuer.(string)
-	}
-
 	if newAudiencePattern, ok := d.GetOk(keyAudiencePattern); ok {
 		pattern, err := regexp.Compile(newAudiencePattern.(string))
 		if err != nil {
@@ -258,7 +253,6 @@ func configResponse(config *Config) (*logical.Response, error) {
 			keySetIAT:              config.SetIAT,
 			keySetJTI:              config.SetJTI,
 			keySetNBF:              config.SetNBF,
-			keyIssuer:              config.Issuer,
 			keyAudiencePattern:     config.AudiencePattern.String(),
 			keySubjectPattern:      config.SubjectPattern.String(),
 			keyMaxAllowedAudiences: config.MaxAudiences,

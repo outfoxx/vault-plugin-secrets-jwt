@@ -56,13 +56,15 @@ func pathSign(b *backend) *framework.Path {
 func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *framework.FieldData) (*logical.Response, error) {
 	roleName := d.Get("name").(string)
 
-	roleEntry, err := b.getRole(ctx, req.Storage, roleName)
+	role, err := b.getRole(ctx, req.Storage, roleName)
 	if err != nil {
 		return nil, err
 	}
-	if roleEntry == nil {
+	if role == nil {
 		return logical.ErrorResponse("unknown role"), logical.ErrInvalidRequest
 	}
+
+	// Gather "freeform" claims
 
 	rawClaims, ok := d.GetOk(keyClaims)
 	if !ok {
@@ -83,16 +85,16 @@ func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *fr
 		if allowedClaim, ok := config.allowedClaimsMap[claim]; !ok || !allowedClaim {
 			return logical.ErrorResponse("claim %s not permitted", claim), logical.ErrInvalidRequest
 		}
-		if _, ok := roleEntry.OtherClaims[claim]; ok {
-			return logical.ErrorResponse("claim %s not permitted, already provided via role configuration", claim), logical.ErrInvalidRequest
+		if _, ok := role.Claims[claim]; ok {
+			return logical.ErrorResponse("claim %s not permitted, already provided by role", claim), logical.ErrInvalidRequest
 		}
 	}
 
-	for otherClaim := range roleEntry.OtherClaims {
-		claims[otherClaim] = roleEntry.OtherClaims[otherClaim]
+	for roleClaim := range role.Claims {
+		claims[roleClaim] = role.Claims[roleClaim]
 	}
 
-	claims["sub"] = roleEntry.Subject
+	claims["iss"] = role.Issuer
 
 	now := b.clock.now()
 
@@ -115,23 +117,35 @@ func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *fr
 		claims["jti"] = jti
 	}
 
-	if config.Issuer != "" {
-		claims["iss"] = config.Issuer
+	if rawSub, ok := claims["sub"]; ok {
+		sub := rawSub.(string)
+		if role.SubjectPattern != nil && !role.SubjectPattern.MatchString(sub) {
+			return logical.ErrorResponse("validation of 'sub' claim failed (doesn't match role restriction)"), logical.ErrInvalidRequest
+		}
+		if config.SubjectPattern != nil && !config.SubjectPattern.MatchString(sub) {
+			return logical.ErrorResponse("validation of 'sub' claim failed (doesn't match config restriction)"), logical.ErrInvalidRequest
+		}
 	}
 
 	if rawAud, ok := claims["aud"]; ok {
 		switch aud := rawAud.(type) {
 		case string:
-			if !config.AudiencePattern.MatchString(aud) {
-				return logical.ErrorResponse("validation of 'aud' claim failed"), logical.ErrInvalidRequest
+			if role.AudiencePattern != nil && !role.AudiencePattern.MatchString(aud) {
+				return logical.ErrorResponse("validation of 'aud' claim failed (doesn't match role restriction)"), logical.ErrInvalidRequest
+			}
+			if config.AudiencePattern != nil && !config.AudiencePattern.MatchString(aud) {
+				return logical.ErrorResponse("validation of 'aud' claim failed (doesn't match config restriction)"), logical.ErrInvalidRequest
 			}
 		case []string:
 			if config.MaxAudiences > -1 && len(aud) > config.MaxAudiences {
 				return logical.ErrorResponse("too many audience claims: %d", len(aud)), logical.ErrInvalidRequest
 			}
 			for _, audEntry := range aud {
-				if !config.AudiencePattern.MatchString(audEntry) {
-					return logical.ErrorResponse("validation of 'aud' claim failed"), logical.ErrInvalidRequest
+				if role.AudiencePattern != nil && !role.AudiencePattern.MatchString(audEntry) {
+					return logical.ErrorResponse("validation of 'aud' claim failed (doesn't match role restriction)"), logical.ErrInvalidRequest
+				}
+				if config.AudiencePattern != nil && !config.AudiencePattern.MatchString(audEntry) {
+					return logical.ErrorResponse("validation of 'aud' claim failed (doesn't match config restriction)"), logical.ErrInvalidRequest
 				}
 			}
 		default:

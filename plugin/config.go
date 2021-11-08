@@ -37,17 +37,16 @@ const (
 	DefaultSetIAT             = true
 	DefaultSetJTI             = true
 	DefaultSetNBF             = true
-	DefaultIssuer             = "vault-plugin-secrets-jwt"
 	DefaultAudiencePattern    = ".*"
 	DefaultSubjectPattern     = ".*"
 	DefaultMaxAudiences       = -1
 )
 
 // DefaultAllowedClaims is the default value for the AllowedClaims config option.
-// By default, only the 'aud' claim can be set by the caller.
-var DefaultAllowedClaims = []string{"aud"}
+// By default, only the 'sub' and 'aud' claims can be set by the caller.
+var DefaultAllowedClaims = []string{"sub", "aud"}
 
-var ReservedClaims = []string{"sub", "iss", "exp", "nbf", "iat", "jti"}
+var ReservedClaims = []string{"iss", "exp", "nbf", "iat", "jti"}
 
 var AllowedSignatureAlgorithmNames = []string{string(jose.ES256), string(jose.ES384), string(jose.ES512), string(jose.RS256), string(jose.RS384), string(jose.RS512)}
 var AllowedRSAKeyBits = []int{2048, 3072, 4096}
@@ -75,9 +74,6 @@ type Config struct {
 	// SetNBF defines if the backend sets the 'nbf' claim. If true, the claim will be set to the same as the 'iat' claim.
 	SetNBF bool
 
-	// Issuer defines the 'iss' claim for the jwt. If blank, it is omitted.
-	Issuer string
-
 	// AudiencePattern defines a regular expression (https://golang.org/pkg/regexp/) which must be matched by any incoming 'aud' claims.
 	// If the audience claim is an array, each element in the array must match the pattern.
 	AudiencePattern *regexp.Regexp
@@ -88,7 +84,7 @@ type Config struct {
 	// MaxAudiences defines the maximum number of strings in the 'aud' claim.
 	MaxAudiences int
 
-	// AllowedClaims defines which claims can be set on the JWT.
+	// AllowedClaims defines which claims can be defined on the role or provided to the sign request to be set on the JWT.
 	AllowedClaims []string
 
 	// allowedClaimsMap is used to easily check if a claim is in the allowed claim set.
@@ -124,6 +120,9 @@ func (b *backend) getConfig(ctx context.Context, stg logical.Storage) (*Config, 
 		if err := json.Unmarshal(rawConfig.Value, conf); err != nil {
 			return nil, err
 		}
+
+		conf.allowedClaimsMap = makeAllowedClaimsMap(conf.AllowedClaims)
+
 		b.cachedConfig = conf
 	} else {
 		// Nothing found, initialize configuration to default and save
@@ -242,7 +241,6 @@ func DefaultConfig(sys logical.SystemView) *Config {
 	c.SetIAT = DefaultSetIAT
 	c.SetJTI = DefaultSetJTI
 	c.SetNBF = DefaultSetNBF
-	c.Issuer = DefaultIssuer
 	c.AudiencePattern = regexp.MustCompile(DefaultAudiencePattern)
 	c.SubjectPattern = regexp.MustCompile(DefaultSubjectPattern)
 	c.MaxAudiences = DefaultMaxAudiences
@@ -256,9 +254,6 @@ func makeAllowedClaimsMap(allowedClaims []string) map[string]bool {
 	newClaims := make(map[string]bool)
 	for _, claim := range allowedClaims {
 		newClaims[claim] = true
-	}
-	for _, claim := range ReservedClaims {
-		newClaims[claim] = false
 	}
 	return newClaims
 }
