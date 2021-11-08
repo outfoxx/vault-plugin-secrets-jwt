@@ -91,7 +91,7 @@ func TestSign(t *testing.T) {
 	}
 
 	claims := map[string]interface{}{
-		"aud": []string{"Zapp Brannigan", "Kif Kroker"},
+		"aud": "Zapp Brannigan",
 	}
 
 	var decoded jwt.Claims
@@ -103,7 +103,7 @@ func TestSign(t *testing.T) {
 	expectedIssuedAt := jwt.NumericDate(0)
 	expectedNotBefore := jwt.NumericDate(0)
 	expectedClaims := jwt.Claims{
-		Audience:  []string{"Zapp Brannigan", "Kif Kroker"},
+		Audience:  []string{"Zapp Brannigan"},
 		Expiry:    &expectedExpiry,
 		IssuedAt:  &expectedIssuedAt,
 		NotBefore: &expectedNotBefore,
@@ -147,6 +147,34 @@ func TestPrivateClaim(t *testing.T) {
 	}
 
 	if diff := deep.Equal(expectedClaims, decoded); diff != nil {
+		t.Error(diff)
+	}
+}
+
+func TestAudienceAsArray(t *testing.T) {
+	b, storage := getTestBackend(t)
+
+	role := "tester"
+
+	if err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{}); err != nil {
+		t.Fatalf("%v\n", err)
+	}
+
+	claims := map[string]interface{}{
+		"aud": []interface{}{"foo", "bar"},
+	}
+
+	var decoded map[string]interface{}
+	if err := getSignedToken(b, storage, role, claims, &decoded); err != nil {
+		t.Fatalf("%v\n", err)
+	}
+
+	aud, ok := decoded["aud"].([]interface{})
+	if !ok {
+		t.Fatalf("audience is not a string array")
+	}
+
+	if diff := deep.Equal(aud, []interface{}{"foo", "bar"}); diff != nil {
 		t.Error(diff)
 	}
 }

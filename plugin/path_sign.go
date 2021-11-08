@@ -136,11 +136,15 @@ func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *fr
 			if config.AudiencePattern != nil && !config.AudiencePattern.MatchString(aud) {
 				return logical.ErrorResponse("validation of 'aud' claim failed (doesn't match config restriction)"), logical.ErrInvalidRequest
 			}
-		case []string:
+		case []interface{}:
 			if config.MaxAudiences > -1 && len(aud) > config.MaxAudiences {
 				return logical.ErrorResponse("too many audience claims: %d", len(aud)), logical.ErrInvalidRequest
 			}
-			for _, audEntry := range aud {
+			for _, rawAudEntry := range aud {
+				audEntry, ok := rawAudEntry.(string)
+				if !ok {
+					return logical.ErrorResponse("'aud' claim was %T, not string", audEntry), logical.ErrInvalidRequest
+				}
 				if role.AudiencePattern != nil && !role.AudiencePattern.MatchString(audEntry) {
 					return logical.ErrorResponse("validation of 'aud' claim failed (doesn't match role restriction)"), logical.ErrInvalidRequest
 				}
