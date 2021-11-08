@@ -14,6 +14,10 @@
 # limitations under the License.
 #
 
+# Produces a Vault container that has the plugin included in the
+# /vault/plugins directory. It also starts the server in dev mode
+# with the `-dev-plugin-dir` set correctly.
+
 # Build the addon
 FROM golang:1.17-alpine as plugin-builder
 COPY main.go go.mod go.sum ${GOPATH}/src/github.com/outfoxx/vault-plugin-secrets-jwt/
