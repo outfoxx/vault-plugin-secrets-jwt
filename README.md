@@ -9,6 +9,7 @@
   * [Roles](#roles)
   * [Signing](#signing)
 * [Implementation Notes](#implementation-notes)
+* [Contributors](#contributors)
 * [Links](#quick-links)
 
 # Overview
@@ -263,6 +264,15 @@ be overridden during the sign request.
 
 The plugin uses the same mechanism as the builtin `Transit` secrets engine. Using `keysutil`
 ensures the key management and rotation is built on a solid cryptographic engine.  
+
+# Contributors
+
+The original plugin started life as a learning exercise for [Ian Fox](https://github.com/ian-fox) and
+I'd like to thank him for his initial proof-of-concept. As we make improvements he has kindly allowed
+us to take over the project and move it forward.
+
+We have taken the original proof-of-concept and rewrote it in hopes of providing a solid plugin that
+can be used in production.
 
 # Quick Links
     - Vault Website: https://www.vaultproject.io
