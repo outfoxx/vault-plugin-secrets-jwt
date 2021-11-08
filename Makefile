@@ -16,7 +16,7 @@ bootstrap:
 # dev creates binaries for testing Vault locally. These are put
 # into ./bin/ as well as $GOPATH/bin.
 dev:
-	@go build
+	@go build -o vault-plugin-secrets-jwt cmd/vault-plugin-secrets-jwt/main.go
 
 # Lint runs the linter. Not used in CI because linting is handled by golangci separately
 lint:

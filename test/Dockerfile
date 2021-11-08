@@ -6,11 +6,12 @@ RUN unzip vault.zip && chmod +x vault
 
 # Build the addon and the test helper
 FROM golang:1.17-alpine as plugin-builder
-COPY main.go go.mod go.sum ${GOPATH}/src/github.com/outfoxx/vault-plugin-secrets-jwt/
+COPY go.mod go.sum ${GOPATH}/src/github.com/outfoxx/vault-plugin-secrets-jwt/
+COPY cmd/vault-plugin-secrets-jwt/main.go ${GOPATH}/src/github.com/outfoxx/vault-plugin-secrets-jwt/cmd/vault-plugin-secrets-jwt/
 COPY plugin/ ${GOPATH}/src/github.com/outfoxx/vault-plugin-secrets-jwt/plugin/
 COPY test/jwtverify/jwtverify.go ${GOPATH}/src/github.com/outfoxx/vault-plugin-secrets-jwt/test/
 WORKDIR ${GOPATH}/src/github.com/outfoxx/vault-plugin-secrets-jwt
-RUN go build -o /vault/plugins/vault-plugin-secrets-jwt
+RUN go build -o /vault/plugins/vault-plugin-secrets-jwt cmd/vault-plugin-secrets-jwt/main.go
 RUN go install test/jwtverify.go
 
 # Test environment

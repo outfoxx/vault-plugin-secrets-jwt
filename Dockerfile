@@ -20,10 +20,11 @@
 
 # Build the addon
 FROM golang:1.17-alpine as plugin-builder
-COPY main.go go.mod go.sum ${GOPATH}/src/github.com/outfoxx/vault-plugin-secrets-jwt/
+COPY go.mod go.sum ${GOPATH}/src/github.com/outfoxx/vault-plugin-secrets-jwt/
+COPY cmd/vault-plugin-secrets-jwt/main.go ${GOPATH}/src/github.com/outfoxx/vault-plugin-secrets-jwt/cmd/vault-plugin-secrets-jwt/
 COPY plugin ${GOPATH}/src/github.com/outfoxx/vault-plugin-secrets-jwt/plugin/
 WORKDIR ${GOPATH}/src/github.com/outfoxx/vault-plugin-secrets-jwt
-RUN go build -o /vault/plugins/vault-plugin-secrets-jwt main.go
+RUN go build -o /vault/plugins/vault-plugin-secrets-jwt cmd/vault-plugin-secrets-jwt/main.go
 
 # Package Vault
 FROM vault:1.8.5
