@@ -231,11 +231,11 @@ those matching a specific pattern; this restriction is in addition to the patter
 defined in the configuration. By default, both claims are unrestricted.
 
 ```bash
-vault write jwt/config subject_pattern=*.example.com
+vault write jwt/roles/test-role subject_pattern=*.example.com
 ```
 
 ```bash
-vault write jwt/config audience_pattern=*.example.com
+vault write jwt/roles/test-role audience_pattern=*.example.com
 ```
 
 ## Signing
