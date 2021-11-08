@@ -120,10 +120,7 @@ func (b *backend) getConfig(ctx context.Context, stg logical.Storage) (*Config, 
 		if err := json.Unmarshal(rawConfig.Value, conf); err != nil {
 			return nil, err
 		}
-
-		conf.allowedClaimsMap = makeAllowedClaimsMap(conf.AllowedClaims)
-
-		b.cachedConfig = conf
+		b.cachedConfig = conf.cache()
 	} else {
 		// Nothing found, initialize configuration to default and save
 		b.cachedConfig = DefaultConfig(b.System())
@@ -210,7 +207,7 @@ func (b *backend) saveConfigUnlocked(ctx context.Context, stg logical.Storage, c
 		return err
 	}
 
-	b.cachedConfig = config
+	b.cachedConfig = config.cache()
 
 	return nil
 }
@@ -245,7 +242,11 @@ func DefaultConfig(sys logical.SystemView) *Config {
 	c.SubjectPattern = regexp.MustCompile(DefaultSubjectPattern)
 	c.MaxAudiences = DefaultMaxAudiences
 	c.AllowedClaims = DefaultAllowedClaims
-	c.allowedClaimsMap = makeAllowedClaimsMap(DefaultAllowedClaims)
+	return c
+}
+
+func (c *Config) cache() *Config {
+	c.allowedClaimsMap = makeAllowedClaimsMap(c.AllowedClaims)
 	return c
 }
 

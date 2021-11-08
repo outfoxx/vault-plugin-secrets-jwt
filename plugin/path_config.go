@@ -211,7 +211,6 @@ func (b *backend) pathConfigWrite(ctx context.Context, req *logical.Request, d *
 		}
 
 		config.AllowedClaims = newAllowedClaims.([]string)
-		config.allowedClaimsMap = makeAllowedClaimsMap(newAllowedClaims.([]string))
 	}
 
 	if config.TokenTTL > b.System().MaxLeaseTTL() {
