@@ -124,12 +124,12 @@ func TestWriteConfig(t *testing.T) {
 	}
 
 	resp, err = writeConfig(b, storage, map[string]interface{}{
-		keyRSAKeyBits:         updateRSAKeyBits,
-		keyRotationDuration:   secondUpdatedRotationPeriod,
-		keyTokenTTL:           updatedTTL,
-		keySetIAT:             false,
-		keySetJTI:             false,
-		keySetNBF:             false,
+		keyRSAKeyBits:       updateRSAKeyBits,
+		keyRotationDuration: secondUpdatedRotationPeriod,
+		keyTokenTTL:         updatedTTL,
+		keySetIAT:           false,
+		keySetJTI:           false,
+		keySetNBF:           false,
 	})
 	if err != nil || (resp != nil && resp.IsError()) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)

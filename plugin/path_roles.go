@@ -52,10 +52,10 @@ type Role struct {
 // Return response data for a role
 func (r *Role) toResponseData() map[string]interface{} {
 	respData := map[string]interface{}{
-		keyIssuer:              r.Issuer,
-		keyClaims:              r.Claims,
-		keySubjectPattern:      r.SubjectPattern,
-		keyAudiencePattern:     r.AudiencePattern,
+		keyIssuer:          r.Issuer,
+		keyClaims:          r.Claims,
+		keySubjectPattern:  r.SubjectPattern,
+		keyAudiencePattern: r.AudiencePattern,
 	}
 	return respData
 }
@@ -79,17 +79,17 @@ func pathRole(b *backend) []*framework.Path {
 					Description: `Claims to be set on issued JWTs. Each claim must be allowed by the configuration.`,
 				},
 				keySubjectPattern: {
-					Type:        framework.TypeString,
+					Type: framework.TypeString,
 					Description: `Regular expression which must match 'sub' claims provided during sign requests.
 This restriction is in addition to that defined in the config.`,
 				},
 				keyAudiencePattern: {
-					Type:        framework.TypeString,
+					Type: framework.TypeString,
 					Description: `Regular expression which must match 'aud' claims provided during sign requests.
 This restriction is in addition to that defined in the config.`,
 				},
 				keyMaxAllowedAudiences: {
-					Type:        framework.TypeInt,
+					Type: framework.TypeInt,
 					Description: `Maximum number of allowed audiences, or -1 for no limit.
 Must be less than or equal to the maximum number of allowed audiences defined in the config`,
 				},
