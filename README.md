@@ -5,6 +5,7 @@
 * [Encryption And Key Managment](#encryption-and-key-management)
 * [Usage](#usage)
   * [Quick Start](#quick-start)
+  * [Container](#container)
   * [Configuration](#configuration)
   * [Roles](#roles)
   * [Signing](#signing)
@@ -55,8 +56,7 @@ Note: Due to its reliance on asymmetric encryption, the plugin will not support 
 
 ## Quick Start
 The plugin needs to be built and installed into your Vault instance's plugin directory prior
-to any attempt at usage.
-
+to any attempt at usage. A prepackaged container is available see [Container](#container).
 
 1. Register the plugin
 
@@ -93,7 +93,15 @@ vault write -f jwt/sign/test-role
 curl https://$VAULT_ADDRESS/v1/jwt/jwk
 ```
 
+## Container
 
+A containerized version of Vault with the plugin pre-packaged inside is available for testing at
+`https://hub.docker.com/r/outfoxx/vault`.
+
+You can easily start a server in dev mode, that has the plugin enabled, using:
+```bash
+docker run --rm -P -e VAULT_DEV_ROOT_TOKEN_ID=root --network=rabbitmq-quickstart outfoxx/vault
+```
 
 ## Configuration
 
