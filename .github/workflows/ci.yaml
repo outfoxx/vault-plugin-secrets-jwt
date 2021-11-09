@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    types: [ opened, synchronize, reopened, closed ]
+    branches: [ main ]
+
+jobs:
+
+  check:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v1
+
+      - name: Linting
+        uses: golangci/golangci-lint-action@v2
+        with:
+          version: v1.43
+
+  build-test:
+
+    runs-on: ubuntu-latest
+
+    needs: [check]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build & Test
+        run: go test -json ./... > test.json
+
+      - name: Annotate tests
+        if: always()
+        uses: guyarb/golang-test-annotations@v0.5.0
+        with:
+          test-results: test.json
+
+      - name: Updload Reports
+        uses: actions/upload-artifact@v2
+        if: always()
+        with:
+          name: test-results
+          path: test.json
