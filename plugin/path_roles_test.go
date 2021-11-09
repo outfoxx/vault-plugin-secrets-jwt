@@ -153,6 +153,38 @@ func TestCreateDisallowedOtherClaim(t *testing.T) {
 
 }
 
+func TestCreateAudienceAsArray(t *testing.T) {
+	b, storage := getTestBackend(t)
+
+	role := "tester"
+
+	claims := map[string]interface{}{
+		"aud": []interface{}{"foo", "bar"},
+	}
+
+	if err := writeRole(b, storage, role, role+".example.com", claims); err != nil {
+		t.Fatalf("%v\n", err)
+	}
+
+	resp, err := readRole(b, storage, role)
+	if err != nil {
+		t.Fatalf("%v\n", err)
+	}
+
+	claims, ok := resp.Data[keyClaims].(map[string]interface{})
+	if !ok {
+		t.Error("failed to read response claims")
+	}
+
+	audience, ok := claims["aud"]
+	if !ok {
+		t.Error("no audience claim found")
+	}
+	if diff := deep.Equal(claims["aud"], audience); diff != nil {
+		t.Error("failed to update audience:", diff)
+	}
+}
+
 func TestList(t *testing.T) {
 	b, storage := getTestBackend(t)
 
