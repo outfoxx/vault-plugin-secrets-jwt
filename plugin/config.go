@@ -24,7 +24,6 @@ import (
 	"github.com/hashicorp/vault/sdk/helper/keysutil"
 	"github.com/hashicorp/vault/sdk/logical"
 	"gopkg.in/square/go-jose.v2"
-	"regexp"
 	"time"
 )
 
@@ -76,10 +75,10 @@ type Config struct {
 
 	// AudiencePattern defines a regular expression (https://golang.org/pkg/regexp/) which must be matched by any incoming 'aud' claims.
 	// If the audience claim is an array, each element in the array must match the pattern.
-	AudiencePattern *regexp.Regexp
+	AudiencePattern string
 
 	// SubjectPattern defines a regular expression (https://golang.org/pkg/regexp/) which must be matched by any incoming 'sub' claims.
-	SubjectPattern *regexp.Regexp
+	SubjectPattern string
 
 	// MaxAudiences defines the maximum number of strings in the 'aud' claim.
 	MaxAudiences int
@@ -117,11 +116,13 @@ func (b *backend) getConfig(ctx context.Context, stg logical.Storage) (*Config, 
 	if rawConfig != nil {
 		// Found it, finish load from storage
 		conf := &Config{}
-		if err := json.Unmarshal(rawConfig.Value, conf); err != nil {
-			return nil, err
+		if err := json.Unmarshal(rawConfig.Value, conf); err == nil {
+			b.cachedConfig = conf.cache()
+		} else {
+			b.Logger().Warn("Failed to unmarshal config, resetting to default")
 		}
-		b.cachedConfig = conf.cache()
-	} else {
+	}
+	if b.cachedConfig == nil {
 		// Nothing found, initialize configuration to default and save
 		b.cachedConfig = DefaultConfig(b.System())
 		if err := b.saveConfigUnlocked(ctx, stg, b.cachedConfig); err != nil {
@@ -238,8 +239,8 @@ func DefaultConfig(sys logical.SystemView) *Config {
 	c.SetIAT = DefaultSetIAT
 	c.SetJTI = DefaultSetJTI
 	c.SetNBF = DefaultSetNBF
-	c.AudiencePattern = regexp.MustCompile(DefaultAudiencePattern)
-	c.SubjectPattern = regexp.MustCompile(DefaultSubjectPattern)
+	c.AudiencePattern = DefaultAudiencePattern
+	c.SubjectPattern = DefaultSubjectPattern
 	c.MaxAudiences = DefaultMaxAudiences
 	c.AllowedClaims = DefaultAllowedClaims
 	return c

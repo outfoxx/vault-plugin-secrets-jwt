@@ -41,12 +41,12 @@ type Role struct {
 
 	// SubjectPattern defines a regular expression (https://golang.org/pkg/regexp/) which must be matched by any
 	// incoming 'sub' claims. This restriction is in addition to that defined on the plugin config.
-	SubjectPattern *regexp.Regexp
+	SubjectPattern string
 
 	// AudiencePattern defines a regular expression (https://golang.org/pkg/regexp/) which must be matched by any
 	// incoming 'aud' claims. If the audience claim is an array, each element in the array must match the pattern.
 	// This restriction is in addition to that defined on the plugin config.
-	AudiencePattern *regexp.Regexp
+	AudiencePattern string
 }
 
 // Return response data for a role
@@ -181,6 +181,8 @@ func (b *backend) pathRolesWrite(ctx context.Context, req *logical.Request, d *f
 
 	if role == nil {
 		role = &Role{}
+		role.SubjectPattern = DefaultSubjectPattern
+		role.AudiencePattern = DefaultAudiencePattern
 	}
 
 	config, err := b.getConfig(ctx, req.Storage)
@@ -201,19 +203,19 @@ func (b *backend) pathRolesWrite(ctx context.Context, req *logical.Request, d *f
 	}
 
 	if newAudiencePattern, ok := d.GetOk(keyAudiencePattern); ok {
-		pattern, err := regexp.Compile(newAudiencePattern.(string))
+		role.AudiencePattern = newAudiencePattern.(string)
+		_, err := regexp.Compile(role.AudiencePattern)
 		if err != nil {
-			return nil, err
+			return logical.ErrorResponse("invalid audience pattern"), err
 		}
-		role.AudiencePattern = pattern
 	}
 
 	if newSubjectPattern, ok := d.GetOk(keySubjectPattern); ok {
-		pattern, err := regexp.Compile(newSubjectPattern.(string))
+		role.SubjectPattern = newSubjectPattern.(string)
+		_, err := regexp.Compile(role.SubjectPattern)
 		if err != nil {
-			return nil, err
+			return logical.ErrorResponse("invalid subject pattern"), err
 		}
-		role.SubjectPattern = pattern
 	}
 
 	// Check any provided claims are allowed from the config.
@@ -237,7 +239,7 @@ func (b *backend) pathRolesWrite(ctx context.Context, req *logical.Request, d *f
 	if rawAud, ok := role.Claims["aud"]; ok {
 		switch aud := rawAud.(type) {
 		case string:
-			if !config.AudiencePattern.MatchString(aud) {
+			if matched, _ := regexp.MatchString(config.AudiencePattern, aud); !matched {
 				return logical.ErrorResponse("validation of 'aud' claim failed"), logical.ErrInvalidRequest
 			}
 		case []interface{}:
@@ -249,7 +251,7 @@ func (b *backend) pathRolesWrite(ctx context.Context, req *logical.Request, d *f
 				if !ok {
 					return logical.ErrorResponse("'aud' claim was %T, not string", audEntry), logical.ErrInvalidRequest
 				}
-				if !config.AudiencePattern.MatchString(audEntry) {
+				if matched, _ := regexp.MatchString(config.AudiencePattern, audEntry); !matched {
 					return logical.ErrorResponse("validation of 'aud' claim failed"), logical.ErrInvalidRequest
 				}
 			}

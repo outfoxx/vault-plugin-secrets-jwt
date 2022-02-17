@@ -182,19 +182,19 @@ func (b *backend) pathConfigWrite(ctx context.Context, req *logical.Request, d *
 	}
 
 	if newAudiencePattern, ok := d.GetOk(keyAudiencePattern); ok {
-		pattern, err := regexp.Compile(newAudiencePattern.(string))
+		config.AudiencePattern = newAudiencePattern.(string)
+		_, err := regexp.Compile(config.AudiencePattern)
 		if err != nil {
-			return nil, err
+			return logical.ErrorResponse("invalid audience pattern"), err
 		}
-		config.AudiencePattern = pattern
 	}
 
 	if newSubjectPattern, ok := d.GetOk(keySubjectPattern); ok {
-		pattern, err := regexp.Compile(newSubjectPattern.(string))
+		config.SubjectPattern = newSubjectPattern.(string)
+		_, err := regexp.Compile(config.SubjectPattern)
 		if err != nil {
-			return nil, err
+			return logical.ErrorResponse("invalid subject pattern"), err
 		}
-		config.SubjectPattern = pattern
 	}
 
 	if newMaxAudiences, ok := d.GetOk(keyMaxAllowedAudiences); ok {
@@ -252,8 +252,8 @@ func configResponse(config *Config) (*logical.Response, error) {
 			keySetIAT:              config.SetIAT,
 			keySetJTI:              config.SetJTI,
 			keySetNBF:              config.SetNBF,
-			keyAudiencePattern:     config.AudiencePattern.String(),
-			keySubjectPattern:      config.SubjectPattern.String(),
+			keyAudiencePattern:     config.AudiencePattern,
+			keySubjectPattern:      config.SubjectPattern,
 			keyMaxAllowedAudiences: config.MaxAudiences,
 			keyAllowedClaims:       config.AllowedClaims,
 		},

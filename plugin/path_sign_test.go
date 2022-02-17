@@ -91,6 +91,7 @@ func TestSign(t *testing.T) {
 	}
 
 	claims := map[string]interface{}{
+		"sub": "Kif Kroker",
 		"aud": "Zapp Brannigan",
 	}
 
@@ -103,6 +104,7 @@ func TestSign(t *testing.T) {
 	expectedIssuedAt := jwt.NumericDate(0)
 	expectedNotBefore := jwt.NumericDate(0)
 	expectedClaims := jwt.Claims{
+		Subject:   "Kif Kroker",
 		Audience:  []string{"Zapp Brannigan"},
 		Expiry:    &expectedExpiry,
 		IssuedAt:  &expectedIssuedAt,

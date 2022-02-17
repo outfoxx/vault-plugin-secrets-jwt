@@ -22,6 +22,7 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
+	"regexp"
 )
 
 const (
@@ -118,22 +119,25 @@ func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *fr
 	}
 
 	if rawSub, ok := claims["sub"]; ok {
-		sub := rawSub.(string)
-		if role.SubjectPattern != nil && !role.SubjectPattern.MatchString(sub) {
-			return logical.ErrorResponse("validation of 'sub' claim failed (doesn't match role restriction)"), logical.ErrInvalidRequest
-		}
-		if config.SubjectPattern != nil && !config.SubjectPattern.MatchString(sub) {
-			return logical.ErrorResponse("validation of 'sub' claim failed (doesn't match config restriction)"), logical.ErrInvalidRequest
+		if sub, ok := rawSub.(string); ok {
+			if matched, _ := regexp.MatchString(role.SubjectPattern, sub); !matched {
+				return logical.ErrorResponse("validation of 'sub' claim failed (doesn't match role restriction)"), logical.ErrInvalidRequest
+			}
+			if matched, _ := regexp.MatchString(config.SubjectPattern, sub); !matched {
+				return logical.ErrorResponse("validation of 'sub' claim failed (doesn't match config restriction)"), logical.ErrInvalidRequest
+			}
+		} else {
+			return logical.ErrorResponse("'sub' claim was %T, not string"), logical.ErrInvalidRequest
 		}
 	}
 
 	if rawAud, ok := claims["aud"]; ok {
 		switch aud := rawAud.(type) {
 		case string:
-			if role.AudiencePattern != nil && !role.AudiencePattern.MatchString(aud) {
+			if matched, _ := regexp.MatchString(role.AudiencePattern, aud); !matched {
 				return logical.ErrorResponse("validation of 'aud' claim failed (doesn't match role restriction)"), logical.ErrInvalidRequest
 			}
-			if config.AudiencePattern != nil && !config.AudiencePattern.MatchString(aud) {
+			if matched, _ := regexp.MatchString(config.AudiencePattern, aud); !matched {
 				return logical.ErrorResponse("validation of 'aud' claim failed (doesn't match config restriction)"), logical.ErrInvalidRequest
 			}
 		case []interface{}:
@@ -145,10 +149,10 @@ func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *fr
 				if !ok {
 					return logical.ErrorResponse("'aud' claim was %T, not string", audEntry), logical.ErrInvalidRequest
 				}
-				if role.AudiencePattern != nil && !role.AudiencePattern.MatchString(audEntry) {
+				if matched, _ := regexp.MatchString(role.AudiencePattern, audEntry); !matched {
 					return logical.ErrorResponse("validation of 'aud' claim failed (doesn't match role restriction)"), logical.ErrInvalidRequest
 				}
-				if config.AudiencePattern != nil && !config.AudiencePattern.MatchString(audEntry) {
+				if matched, _ := regexp.MatchString(config.AudiencePattern, audEntry); !matched {
 					return logical.ErrorResponse("validation of 'aud' claim failed (doesn't match config restriction)"), logical.ErrInvalidRequest
 				}
 			}
