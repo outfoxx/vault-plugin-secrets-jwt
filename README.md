@@ -119,7 +119,21 @@ Allow `aud` and `groups` claims:
 vault write jwt/config allowed_claims="aud" allowed_claims="groups" 
 ```
 
-ℹ️ The `allowed_claims` field is a list, passing multiple values to `vault` cli allows you to 
+ℹ️ The `allowed_claims` field is a list, passing multiple values to `vault` cli allows you to
+create a list.
+
+### 🔸 Allowed Headers
+
+The plugin requires that any headers provided during role creation be explicitly
+allowed in the configuration.
+
+Allow `iss` and `path` claims:
+
+```bash
+vault write jwt/config allowed_headers="iss" allowed_headers="path" 
+```
+
+ℹ️ The `allowed_headers` field is a list, passing multiple values to `vault` cli allows you to
 create a list.
 
 ### 🔸 Signature Algorithm
@@ -231,6 +245,19 @@ echo claims '{"claims": {"groups":"test-group"}}' | vault write jwt/roles/test-r
 
 ℹ️ Any claims set in a role's `claims` field must be explicitly allowed in the
 plugin's configuration and can no longer be set during a sign request.
+
+### 🔸 Other Headers
+
+Roles can additionally include any other headers that are allowed by the configuration.
+
+```bash
+echo claims '{"headers": {"iss":"some-key-issuer"}}' | vault write jwt/roles/test-role -
+```
+
+⚠️ Due to deficiencies of the `vault` cli, you need to pass `headers` in as JSON.
+
+ℹ️ Any headers set in a role's `headers` field must be explicitly allowed in the
+plugin's configuration.
 
 ### 🔸 Audience & Subject Restrictions
 
