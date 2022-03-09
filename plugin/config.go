@@ -46,6 +46,7 @@ const (
 var DefaultAllowedClaims = []string{"sub", "aud"}
 
 var ReservedClaims = []string{"iss", "exp", "nbf", "iat", "jti"}
+var ReservedHeaders = []string{"kid", "alg", "enc", "zip", "crit"}
 
 var AllowedSignatureAlgorithmNames = []string{string(jose.ES256), string(jose.ES384), string(jose.ES512), string(jose.RS256), string(jose.RS384), string(jose.RS512)}
 var AllowedRSAKeyBits = []int{2048, 3072, 4096}
@@ -88,6 +89,12 @@ type Config struct {
 
 	// allowedClaimsMap is used to easily check if a claim is in the allowed claim set.
 	allowedClaimsMap map[string]bool
+
+	// AllowedHeaders defines which headers can be defined on the role or provided to the sign request to be set on the JWT.
+	AllowedHeaders []string
+
+	// allowedHeadersMap is used to easily check if a header is in the allowed header set.
+	allowedHeadersMap map[string]bool
 }
 
 func (b *backend) getConfig(ctx context.Context, stg logical.Storage) (*Config, error) {
@@ -248,6 +255,7 @@ func DefaultConfig(sys logical.SystemView) *Config {
 
 func (c *Config) cache() *Config {
 	c.allowedClaimsMap = makeAllowedClaimsMap(c.AllowedClaims)
+	c.allowedHeadersMap = makeAllowedClaimsMap(c.AllowedHeaders)
 	return c
 }
 

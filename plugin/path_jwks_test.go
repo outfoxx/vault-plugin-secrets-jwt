@@ -60,7 +60,7 @@ func FetchJWKS(b *backend, storage *logical.Storage) (*jose.JSONWebKeySet, error
 func TestJwks(t *testing.T) {
 	b, storage := getTestBackend(t)
 
-	err := writeRole(b, storage, "tester", "tester.example.com", map[string]interface{}{})
+	err := writeRole(b, storage, "tester", "tester.example.com", map[string]interface{}{}, map[string]interface{}{})
 	if err != nil {
 		t.Fatalf("%s\n", err)
 	}

@@ -25,9 +25,10 @@ import (
 	"testing"
 )
 
-func getSignedToken(b *backend, storage *logical.Storage, role string, claims map[string]interface{}, dest interface{}) error {
+func getSignedToken(b *backend, storage *logical.Storage, role string, claims map[string]interface{}, headers map[string]interface{}, claimsDest interface{}, headersDest map[string]interface{}) error {
 	data := map[string]interface{}{
-		"claims": claims,
+		"claims":  claims,
+		"headers": headers,
 	}
 
 	req := &logical.Request{
@@ -67,14 +68,20 @@ func getSignedToken(b *backend, storage *logical.Storage, role string, claims ma
 		return fmt.Errorf("error locating unique public keys: %s", err)
 	}
 
-	var target interface{}
-	if dest != nil {
-		target = dest
-	} else {
-		target = &jwt.Claims{}
+	if headersDest != nil {
+		for header := range token.Headers[0].ExtraHeaders {
+			headersDest[string(header)] = token.Headers[0].ExtraHeaders[header]
+		}
 	}
 
-	if err = token.Claims(matchingPublicKeys[0], target); err != nil {
+	var targetClaims interface{}
+	if claimsDest != nil {
+		targetClaims = claimsDest
+	} else {
+		targetClaims = &jwt.Claims{}
+	}
+
+	if err = token.Claims(matchingPublicKeys[0], targetClaims); err != nil {
 		return fmt.Errorf("error decoding claims: %s", err)
 	}
 
@@ -86,7 +93,7 @@ func TestSign(t *testing.T) {
 
 	role := "tester"
 
-	if err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{}); err != nil {
+	if err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{}, map[string]interface{}{}); err != nil {
 		t.Fatalf("%v\n", err)
 	}
 
@@ -96,7 +103,7 @@ func TestSign(t *testing.T) {
 	}
 
 	var decoded jwt.Claims
-	if err := getSignedToken(b, storage, role, claims, &decoded); err != nil {
+	if err := getSignedToken(b, storage, role, claims, map[string]interface{}{}, &decoded, nil); err != nil {
 		t.Fatalf("%v\n", err)
 	}
 
@@ -131,7 +138,7 @@ func TestPrivateClaim(t *testing.T) {
 
 	role := "tester"
 
-	if err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{"aud": "an audience"}); err != nil {
+	if err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{"aud": "an audience"}, map[string]interface{}{}); err != nil {
 		t.Fatalf("%v\n", err)
 	}
 
@@ -140,7 +147,7 @@ func TestPrivateClaim(t *testing.T) {
 	}
 
 	var decoded customToken
-	if err := getSignedToken(b, storage, role, claims, &decoded); err != nil {
+	if err := getSignedToken(b, storage, role, claims, map[string]interface{}{}, &decoded, nil); err != nil {
 		t.Fatalf("%v\n", err)
 	}
 
@@ -153,12 +160,44 @@ func TestPrivateClaim(t *testing.T) {
 	}
 }
 
+func TestPrivateHeader(t *testing.T) {
+	b, storage := getTestBackend(t)
+
+	if _, err := writeConfig(b, storage, map[string]interface{}{"allowed_headers": []string{"tid"}}); err != nil {
+		t.Fatalf("%v\n", err)
+	}
+
+	role := "tester"
+
+	if err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{}, map[string]interface{}{"tid": "12345"}); err != nil {
+		t.Fatalf("%v\n", err)
+	}
+
+	headers := map[string]interface{}{
+		"tid": "12345",
+	}
+
+	decoded := map[string]interface{}{}
+	if err := getSignedToken(b, storage, role, map[string]interface{}{}, headers, nil, decoded); err != nil {
+		t.Fatalf("%v\n", err)
+	}
+
+	expectedHeaders := map[string]interface{}{
+		"typ": "JWT",
+		"tid": "12345",
+	}
+
+	if diff := deep.Equal(expectedHeaders, decoded); diff != nil {
+		t.Error(diff)
+	}
+}
+
 func TestAudienceAsArray(t *testing.T) {
 	b, storage := getTestBackend(t)
 
 	role := "tester"
 
-	if err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{}); err != nil {
+	if err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{}, map[string]interface{}{}); err != nil {
 		t.Fatalf("%v\n", err)
 	}
 
@@ -167,7 +206,7 @@ func TestAudienceAsArray(t *testing.T) {
 	}
 
 	var decoded map[string]interface{}
-	if err := getSignedToken(b, storage, role, claims, &decoded); err != nil {
+	if err := getSignedToken(b, storage, role, claims, map[string]interface{}{}, &decoded, nil); err != nil {
 		t.Fatalf("%v\n", err)
 	}
 
@@ -186,7 +225,7 @@ func TestRejectReservedClaims(t *testing.T) {
 
 	role := "tester"
 
-	if err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{}); err != nil {
+	if err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{}, map[string]interface{}{}); err != nil {
 		t.Fatalf("%v\n", err)
 	}
 
@@ -214,7 +253,7 @@ func TestRejectOverwriteRoleOtherClaim(t *testing.T) {
 
 	role := "tester"
 
-	if err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{"aud": "an audience"}); err != nil {
+	if err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{"aud": "an audience"}, map[string]interface{}{}); err != nil {
 		t.Fatalf("%v\n", err)
 	}
 

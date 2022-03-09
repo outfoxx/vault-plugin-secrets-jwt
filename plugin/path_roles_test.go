@@ -25,10 +25,11 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 )
 
-func writeRole(b *backend, storage *logical.Storage, name string, issuer string, claims map[string]interface{}) error {
+func writeRole(b *backend, storage *logical.Storage, name string, issuer string, claims map[string]interface{}, headers map[string]interface{}) error {
 	data := map[string]interface{}{
-		"issuer": issuer,
-		"claims": claims,
+		"issuer":  issuer,
+		"claims":  claims,
+		"headers": headers,
 	}
 
 	req := &logical.Request{
@@ -67,7 +68,7 @@ func TestCreate(t *testing.T) {
 
 	role := "tester"
 
-	err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{})
+	err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{}, map[string]interface{}{})
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -96,12 +97,12 @@ func TestCreateRestrictedAudience(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	err = writeRole(b, storage, role, role+".example.com", map[string]interface{}{"aud": "invalid audience"})
+	err = writeRole(b, storage, role, role+".example.com", map[string]interface{}{"aud": "invalid audience"}, map[string]interface{}{})
 	if err == nil {
 		t.Fatalf("create role with non-matching audience pattern succeeded")
 	}
 
-	err = writeRole(b, storage, role, role+".example.com", map[string]interface{}{"aud": "audience.example.com"})
+	err = writeRole(b, storage, role, role+".example.com", map[string]interface{}{"aud": "audience.example.com"}, map[string]interface{}{})
 	if err != nil {
 		t.Fatalf("%s\n", err)
 	}
@@ -131,12 +132,12 @@ func TestCreateDisallowedOtherClaim(t *testing.T) {
 
 	role := "tester"
 
-	err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{"sub": "not allowed"})
+	err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{"sub": "not allowed"}, map[string]interface{}{})
 	if err == nil {
 		t.Fatalf("Create role should have failed")
 	}
 
-	err = writeRole(b, storage, role, role+".example.com", map[string]interface{}{"foo": "bar"})
+	err = writeRole(b, storage, role, role+".example.com", map[string]interface{}{"foo": "bar"}, map[string]interface{}{})
 	if err == nil {
 		t.Fatalf("Create role should have failed")
 	}
@@ -146,7 +147,29 @@ func TestCreateDisallowedOtherClaim(t *testing.T) {
 		t.Fatalf("err:%s resp:%#v\n", err, resp)
 	}
 
-	err = writeRole(b, storage, role, role+".example.com", map[string]interface{}{"foo": "bar"})
+	err = writeRole(b, storage, role, role+".example.com", map[string]interface{}{"foo": "bar"}, map[string]interface{}{})
+	if err != nil {
+		t.Errorf("%s\n", err)
+	}
+
+}
+
+func TestCreateDisallowedOtherHeader(t *testing.T) {
+	b, storage := getTestBackend(t)
+
+	role := "tester"
+
+	err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{}, map[string]interface{}{"tid": "not allowed"})
+	if err == nil {
+		t.Fatalf("Create role should have failed")
+	}
+
+	resp, err := writeConfig(b, storage, map[string]interface{}{"allowed_headers": []string{"tid"}})
+	if err != nil {
+		t.Fatalf("err:%s resp:%#v\n", err, resp)
+	}
+
+	err = writeRole(b, storage, role, role+".example.com", map[string]interface{}{}, map[string]interface{}{"tid": "12345"})
 	if err != nil {
 		t.Errorf("%s\n", err)
 	}
@@ -162,7 +185,7 @@ func TestCreateAudienceAsArray(t *testing.T) {
 		"aud": []interface{}{"foo", "bar"},
 	}
 
-	if err := writeRole(b, storage, role, role+".example.com", claims); err != nil {
+	if err := writeRole(b, storage, role, role+".example.com", claims, map[string]interface{}{}); err != nil {
 		t.Fatalf("%v\n", err)
 	}
 
@@ -188,12 +211,12 @@ func TestCreateAudienceAsArray(t *testing.T) {
 func TestList(t *testing.T) {
 	b, storage := getTestBackend(t)
 
-	err := writeRole(b, storage, "tester1", "tester.example.com", map[string]interface{}{})
+	err := writeRole(b, storage, "tester1", "tester.example.com", map[string]interface{}{}, map[string]interface{}{})
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
 
-	err = writeRole(b, storage, "tester2", "tester.example.com", map[string]interface{}{})
+	err = writeRole(b, storage, "tester2", "tester.example.com", map[string]interface{}{}, map[string]interface{}{})
 	if err != nil {
 		t.Fatalf("%v\n", err)
 	}
@@ -224,7 +247,7 @@ func TestDelete(t *testing.T) {
 
 	role := "tester"
 
-	if err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{}); err != nil {
+	if err := writeRole(b, storage, role, role+".example.com", map[string]interface{}{}, map[string]interface{}{}); err != nil {
 		t.Fatalf("%v\n", err)
 	}
 

@@ -197,6 +197,13 @@ func TestWriteInvalidConfig(t *testing.T) {
 	}
 
 	resp, err = writeConfig(b, storage, map[string]interface{}{
+		keyAllowedHeaders: []string{"kid"},
+	})
+	if err == nil {
+		t.Errorf("Should have errored but got response: %#v", resp)
+	}
+
+	resp, err = writeConfig(b, storage, map[string]interface{}{
 		keySignatureAlgorithm: "HS256",
 	})
 	if err == nil {

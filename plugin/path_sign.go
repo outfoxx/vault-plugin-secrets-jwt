@@ -26,7 +26,8 @@ import (
 )
 
 const (
-	keyClaims = "claims"
+	keyClaims  = "claims"
+	keyHeaders = "headers"
 )
 
 func pathSign(b *backend) *framework.Path {
@@ -171,6 +172,11 @@ func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *fr
 		SignatureAlgorithm: config.SignatureAlgorithm,
 		Policy:             policy,
 		SignerOptions:      (&jose.SignerOptions{}).WithType("JWT"),
+	}
+
+	for headerName := range role.Headers {
+		headerValue := role.Headers[headerName]
+		signer.SignerOptions = signer.SignerOptions.WithHeader(jose.HeaderKey(headerName), headerValue)
 	}
 
 	token, err := jwt.Signed(signer).Claims(claims).CompactSerialize()
