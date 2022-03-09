@@ -273,6 +273,7 @@ func configResponse(config *Config) (*logical.Response, error) {
 			keySubjectPattern:      config.SubjectPattern,
 			keyMaxAllowedAudiences: config.MaxAudiences,
 			keyAllowedClaims:       config.AllowedClaims,
+			keyAllowedHeaders:      config.AllowedHeaders,
 		},
 	}, nil
 }
