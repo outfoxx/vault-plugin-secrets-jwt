@@ -20,7 +20,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"os"
 
@@ -57,7 +57,7 @@ func validateToken(rawToken, jwksEndpoint string) error {
 	}
 
 	defer resp.Body.Close()
-	jwksBody, err := ioutil.ReadAll(resp.Body)
+	jwksBody, err := io.ReadAll(resp.Body)
 	if err != nil {
 		return err
 	}

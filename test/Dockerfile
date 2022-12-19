@@ -1,11 +1,11 @@
 # Install vault
 FROM alpine as vault-installer
 WORKDIR /vault
-RUN wget https://releases.hashicorp.com/vault/1.2.3/vault_1.2.3_linux_amd64.zip -O vault.zip
+RUN wget https://releases.hashicorp.com/vault/1.12.2/vault_1.12.2_linux_amd64.zip -O vault.zip
 RUN unzip vault.zip && chmod +x vault
 
 # Build the addon and the test helper
-FROM golang:1.17-alpine as plugin-builder
+FROM golang:1.19-alpine as plugin-builder
 COPY go.mod go.sum ${GOPATH}/src/github.com/outfoxx/vault-plugin-secrets-jwt/
 COPY cmd/vault-plugin-secrets-jwt/main.go ${GOPATH}/src/github.com/outfoxx/vault-plugin-secrets-jwt/cmd/vault-plugin-secrets-jwt/
 COPY plugin/ ${GOPATH}/src/github.com/outfoxx/vault-plugin-secrets-jwt/plugin/
