@@ -32,18 +32,10 @@ endif
 
 # functional runs a full end-to-end functional test in docker.
 functional:
-	@docker build -f test/Dockerfile -t vault-jwt-e2e-test .
+	@docker build --no-cache -f test/Dockerfile -t vault-jwt-e2e-test .
 
 # fmt formats the files according to go recommended style
 fmt:
 	@gofmt -w $(GOFMT_FILES)
-
-tag:
-ifeq (${TRAVIS_BRANCH},master)
-	@git config --global user.email "builds@travis-ci.com"
-	@git config --global user.name "Travis CI"
-	@git tag ${BUILD_VERSION} 
-	@git push https://${GH_TOKEN}@github.com/outfoxx/vault-plugin-secrets-jwt.git ${BUILD_VERSION} > /dev/null 2>&1
-endif
 
 .PHONY: default bootstrap dev lint test functional fmt tag
