@@ -14,12 +14,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v1
+    - uses: actions/checkout@v3
 
-      - name: Linting
-        uses: golangci/golangci-lint-action@v2
-        with:
-          version: v1.43
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19
+
+    - name: Linting
+      uses: golangci/golangci-lint-action@v2
+      with:
+        version: v1.50
 
   build-test:
 
@@ -28,20 +33,28 @@ jobs:
     needs: [check]
 
     steps:
-      - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
 
-      - name: Build & Test
-        run: go test -json ./... > test.json
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: 1.19
 
-      - name: Annotate tests
-        if: always()
-        uses: guyarb/golang-test-annotations@v0.5.0
-        with:
-          test-results: test.json
+    - name: Build & Test
+      run: go test -json ./... > test.json
 
-      - name: Updload Reports
-        uses: actions/upload-artifact@v2
-        if: always()
-        with:
-          name: test-results
-          path: test.json
+    - name: Annotate tests
+      if: always()
+      uses: guyarb/golang-test-annotations@v0.6.0
+      with:
+        test-results: test.json
+
+    - name: Functional Test
+      run: make functional
+
+    - name: Upload Reports
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: test-results
+        path: test.json
