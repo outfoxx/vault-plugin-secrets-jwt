@@ -1,7 +1,7 @@
 # Install vault
 FROM alpine as vault-installer
 WORKDIR /vault
-RUN wget https://releases.hashicorp.com/vault/1.12.2/vault_1.12.2_linux_amd64.zip -O vault.zip
+RUN wget https://releases.hashicorp.com/vault/1.10.10/vault_1.10.10_linux_amd64.zip -O vault.zip
 RUN unzip vault.zip && chmod +x vault
 
 # Build the addon and the test helper
