@@ -34,6 +34,9 @@ import (
 const (
 	configPath  = "config"
 	mainKeyName = "main"
+
+	// Minimum cache size for transit backend
+	minCacheSize = 10
 )
 
 type backend struct {
@@ -59,10 +62,10 @@ func Factory(ctx context.Context, conf *logical.BackendConfig) (logical.Backend,
 }
 
 func createBackend(conf *logical.BackendConfig) (*backend, error) {
-	var b = backend{}
+	var b backend
 
 	var err error
-	b.lockManager, err = keysutil.NewLockManager(true, 0)
+	b.lockManager, err = keysutil.NewLockManager(true, minCacheSize)
 	if err != nil {
 		return nil, err
 	}
@@ -223,8 +226,8 @@ func (b *backend) pruneKeyVersions(ctx context.Context, stg logical.Storage, pol
 
 	logger := b.Logger()
 
-	if logger.IsTrace() {
-		logger.Trace(fmt.Sprintf("Pruning Keys: mount=%s", mount))
+	if logger.IsDebug() {
+		logger.Debug(fmt.Sprintf("Pruning Keys: mount=%s", mount))
 	}
 
 	policy.Lock(false)
@@ -240,7 +243,7 @@ func (b *backend) pruneKeyVersions(ctx context.Context, stg logical.Storage, pol
 		keyExpiresAt := keyVersion.CreationTime.Add(config.KeyRotationPeriod).Add(config.TokenTTL)
 
 		if logger.IsDebug() {
-			logger.Info(
+			logger.Debug(
 				fmt.Sprintf(
 					"Checking Key: mount=%s, version=%d created=%s, expires=%s",
 					mount,
