@@ -33,10 +33,11 @@ func writeRole(b *backend, storage *logical.Storage, name string, issuer string,
 	}
 
 	req := &logical.Request{
-		Operation: logical.CreateOperation,
-		Path:      "roles/" + name,
-		Storage:   *storage,
-		Data:      data,
+		Operation:  logical.CreateOperation,
+		Path:       "roles/" + name,
+		Storage:    *storage,
+		Data:       data,
+		MountPoint: "test",
 	}
 
 	resp, err := b.HandleRequest(context.Background(), req)
@@ -50,9 +51,10 @@ func writeRole(b *backend, storage *logical.Storage, name string, issuer string,
 func readRole(b *backend, storage *logical.Storage, name string) (*logical.Response, error) {
 
 	req := &logical.Request{
-		Operation: logical.ReadOperation,
-		Path:      "roles/" + name,
-		Storage:   *storage,
+		Operation:  logical.ReadOperation,
+		Path:       "roles/" + name,
+		Storage:    *storage,
+		MountPoint: "test",
 	}
 
 	resp, err := b.HandleRequest(context.Background(), req)
@@ -222,9 +224,10 @@ func TestList(t *testing.T) {
 	}
 
 	req := &logical.Request{
-		Operation: logical.ListOperation,
-		Path:      "roles",
-		Storage:   *storage,
+		Operation:  logical.ListOperation,
+		Path:       "roles",
+		Storage:    *storage,
+		MountPoint: "test",
 	}
 
 	resp, err := b.HandleRequest(context.Background(), req)
@@ -252,9 +255,10 @@ func TestDelete(t *testing.T) {
 	}
 
 	req := &logical.Request{
-		Operation: logical.DeleteOperation,
-		Path:      "roles/" + role,
-		Storage:   *storage,
+		Operation:  logical.DeleteOperation,
+		Path:       "roles/" + role,
+		Storage:    *storage,
+		MountPoint: "test",
 	}
 
 	if _, err := b.HandleRequest(context.Background(), req); err != nil {

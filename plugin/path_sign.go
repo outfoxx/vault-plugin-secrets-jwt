@@ -23,6 +23,7 @@ import (
 	"gopkg.in/square/go-jose.v2"
 	"gopkg.in/square/go-jose.v2/jwt"
 	"regexp"
+	"time"
 )
 
 const (
@@ -98,7 +99,7 @@ func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *fr
 
 	claims["iss"] = role.Issuer
 
-	now := b.clock.now()
+	now := time.Now()
 
 	expiry := now.Add(config.TokenTTL)
 	claims["exp"] = jwt.NumericDate(expiry.Unix())
@@ -162,7 +163,7 @@ func (b *backend) pathSignWrite(ctx context.Context, req *logical.Request, d *fr
 		}
 	}
 
-	policy, err := b.getPolicy(ctx, req.Storage, config)
+	policy, err := b.getPolicy(ctx, req.Storage, config, req.MountPoint)
 	if err != nil {
 		return logical.ErrorResponse("error getting key: %v", err), err
 	}

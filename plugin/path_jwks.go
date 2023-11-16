@@ -43,7 +43,7 @@ func pathJwks(b *backend) *framework.Path {
 
 func (b *backend) pathJwksRead(ctx context.Context, req *logical.Request, _ *framework.FieldData) (*logical.Response, error) {
 
-	jwkSet, err := b.getPublicKeys(ctx, req.Storage)
+	jwkSet, err := b.getPublicKeys(ctx, req.Storage, req.MountPoint)
 	if err != nil {
 		return nil, err
 	}
@@ -63,14 +63,14 @@ func (b *backend) pathJwksRead(ctx context.Context, req *logical.Request, _ *fra
 }
 
 // GetPublicKeys returns a set of JSON Web Keys.
-func (b *backend) getPublicKeys(ctx context.Context, stg logical.Storage) (*jose.JSONWebKeySet, error) {
+func (b *backend) getPublicKeys(ctx context.Context, stg logical.Storage, mount string) (*jose.JSONWebKeySet, error) {
 
 	config, err := b.getConfig(ctx, stg)
 	if err != nil {
 		return nil, err
 	}
 
-	policy, err := b.getPolicy(ctx, stg, config)
+	policy, err := b.getPolicy(ctx, stg, config, mount)
 	if err != nil {
 		return nil, err
 	}

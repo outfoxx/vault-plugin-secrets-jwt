@@ -35,10 +35,11 @@ const (
 func writeConfig(b *backend, storage *logical.Storage, config map[string]interface{}) (*logical.Response, error) {
 
 	req := &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "config",
-		Storage:   *storage,
-		Data:      config,
+		Operation:  logical.UpdateOperation,
+		Path:       "config",
+		Storage:    *storage,
+		Data:       config,
+		MountPoint: "test",
 	}
 
 	resp, err := b.HandleRequest(context.Background(), req)
@@ -55,9 +56,10 @@ func TestDefaultConfig(t *testing.T) {
 	b, storage := getTestBackend(t)
 
 	req := &logical.Request{
-		Operation: logical.ReadOperation,
-		Path:      "config",
-		Storage:   *storage,
+		Operation:  logical.ReadOperation,
+		Path:       "config",
+		Storage:    *storage,
+		MountPoint: "test",
 	}
 
 	resp, err := b.HandleRequest(context.Background(), req)

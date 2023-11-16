@@ -23,6 +23,7 @@ import (
 	"github.com/hashicorp/vault/sdk/logical"
 	"gopkg.in/square/go-jose.v2/jwt"
 	"testing"
+	"time"
 )
 
 func getSignedToken(b *backend, storage *logical.Storage, role string, claims map[string]interface{}, headers map[string]interface{}, claimsDest interface{}, headersDest map[string]interface{}) error {
@@ -32,10 +33,11 @@ func getSignedToken(b *backend, storage *logical.Storage, role string, claims ma
 	}
 
 	req := &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "sign/" + role,
-		Storage:   *storage,
-		Data:      data,
+		Operation:  logical.UpdateOperation,
+		Path:       "sign/" + role,
+		Storage:    *storage,
+		Data:       data,
+		MountPoint: "test",
 	}
 
 	resp, err := b.HandleRequest(context.Background(), req)
@@ -107,15 +109,33 @@ func TestSign(t *testing.T) {
 		t.Fatalf("%v\n", err)
 	}
 
-	expectedExpiry := jwt.NumericDate(3 * 60)
-	expectedIssuedAt := jwt.NumericDate(0)
-	expectedNotBefore := jwt.NumericDate(0)
+	if decoded.Expiry.Time().After(time.Now().Add((3 * time.Minute) + (1 * time.Second))) {
+		t.Errorf("expiry is too far in the future")
+	}
+	if decoded.Expiry.Time().Before(time.Now().Add((3 * time.Minute) - (1 * time.Second))) {
+		t.Errorf("expiry is too far in the past")
+	}
+	decoded.Expiry = nil
+
+	if decoded.IssuedAt.Time().After(time.Now().Add(1 * time.Second)) {
+		t.Errorf("issued at is too far in the future")
+	}
+	if decoded.IssuedAt.Time().Before(time.Now().Add(-1 * time.Second)) {
+		t.Errorf("issued at is too far in the past")
+	}
+	decoded.IssuedAt = nil
+
+	if decoded.NotBefore.Time().After(time.Now().Add(1 * time.Second)) {
+		t.Errorf("not before is too far in the future")
+	}
+	if decoded.NotBefore.Time().Before(time.Now().Add(-1 * time.Second)) {
+		t.Errorf("not before is too far in the past")
+	}
+	decoded.NotBefore = nil
+
 	expectedClaims := jwt.Claims{
 		Subject:   "Kif Kroker",
 		Audience:  []string{"Zapp Brannigan"},
-		Expiry:    &expectedExpiry,
-		IssuedAt:  &expectedIssuedAt,
-		NotBefore: &expectedNotBefore,
 		ID:        "1",
 		Issuer:    role + ".example.com",
 	}
@@ -236,10 +256,11 @@ func TestRejectReservedClaims(t *testing.T) {
 	}
 
 	req := &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "sign/" + role,
-		Storage:   *storage,
-		Data:      data,
+		Operation:  logical.UpdateOperation,
+		Path:       "sign/" + role,
+		Storage:    *storage,
+		Data:       data,
+		MountPoint: "test",
 	}
 
 	resp, err := b.HandleRequest(context.Background(), req)
@@ -264,10 +285,11 @@ func TestRejectOverwriteRoleOtherClaim(t *testing.T) {
 	}
 
 	req := &logical.Request{
-		Operation: logical.UpdateOperation,
-		Path:      "sign/" + role,
-		Storage:   *storage,
-		Data:      data,
+		Operation:  logical.UpdateOperation,
+		Path:       "sign/" + role,
+		Storage:    *storage,
+		Data:       data,
+		MountPoint: "test",
 	}
 
 	resp, err := b.HandleRequest(context.Background(), req)

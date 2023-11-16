@@ -30,9 +30,10 @@ import (
 func FetchJWKS(b *backend, storage *logical.Storage) (*jose.JSONWebKeySet, error) {
 
 	req := &logical.Request{
-		Operation: logical.ReadOperation,
-		Path:      "jwks",
-		Storage:   *storage,
+		Operation:  logical.ReadOperation,
+		Path:       "jwks",
+		Storage:    *storage,
+		MountPoint: "test",
 	}
 
 	resp, err := b.HandleRequest(context.Background(), req)
@@ -70,7 +71,7 @@ func TestJwks(t *testing.T) {
 		t.Fatalf("err:%s\n", err)
 	}
 
-	expectedKeySet, err := b.getPublicKeys(context.Background(), *storage)
+	expectedKeySet, err := b.getPublicKeys(context.Background(), *storage, "test")
 	if err != nil {
 		t.Fatalf("err: %#v", err)
 	}

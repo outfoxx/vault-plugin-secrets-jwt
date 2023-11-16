@@ -147,7 +147,7 @@ func (c *Config) copy() *Config {
 	return &cc
 }
 
-func (b *backend) saveConfig(ctx context.Context, stg logical.Storage, config *Config) error {
+func (b *backend) saveConfig(ctx context.Context, stg logical.Storage, config *Config, mount string) error {
 	b.cachedConfigLock.Lock()
 	defer b.cachedConfigLock.Unlock()
 
@@ -166,7 +166,7 @@ func (b *backend) saveConfig(ctx context.Context, stg logical.Storage, config *C
 
 	b.Logger().Info("Key Format Rotation")
 
-	policy, err := b.getPolicy(ctx, stg, config)
+	policy, err := b.getPolicy(ctx, stg, config, mount)
 	if err != nil {
 		return err
 	}
