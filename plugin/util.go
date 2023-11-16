@@ -27,27 +27,6 @@ import (
 	"github.com/mariuszs/friendlyid-go/friendlyid"
 )
 
-// clock is an interface for obtaining the current time.
-type clock interface {
-	now() time.Time
-}
-
-// realClock is a clock which returns the actual current time.
-type realClock struct{}
-
-func (r realClock) now() time.Time {
-	return time.Now()
-}
-
-// fakeClock is a clock which can be used for testing.
-type fakeClock struct {
-	Instant time.Time
-}
-
-func (f fakeClock) now() time.Time {
-	return f.Instant
-}
-
 // uniqueIdGenerator is an interface for generating unique ids.
 type uniqueIdGenerator interface {
 	id() (string, error)

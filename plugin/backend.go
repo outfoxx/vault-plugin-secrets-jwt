@@ -46,7 +46,6 @@ type backend struct {
 	cachedConfig     *Config
 	cachedConfigLock *sync.RWMutex
 	idGen            uniqueIdGenerator
-	clock            clock
 }
 
 // Factory returns a new backend as logical.Backend.
@@ -72,7 +71,6 @@ func createBackend(conf *logical.BackendConfig) (*backend, error) {
 
 	b.id = conf.BackendUUID
 	b.cachedConfigLock = new(sync.RWMutex)
-	b.clock = realClock{}
 	b.idGen = friendlyIdGenerator{}
 
 	b.Backend = &framework.Backend{
@@ -118,7 +116,7 @@ func (b *backend) periodic(ctx context.Context, req *logical.Request) error {
 		return err
 	}
 
-	policy, err := b.getPolicy(ctx, req.Storage, config)
+	policy, err := b.getPolicy(ctx, req.Storage, config, req.MountPoint)
 	if err != nil {
 		return err
 	}
@@ -145,7 +143,7 @@ func (b *backend) clean(_ context.Context) {
 	// Nothing to do
 }
 
-func (b *backend) getPolicy(ctx context.Context, stg logical.Storage, config *Config) (*keysutil.Policy, error) {
+func (b *backend) getPolicy(ctx context.Context, stg logical.Storage, config *Config, mount string) (*keysutil.Policy, error) {
 
 	polReq := keysutil.PolicyRequest{
 		Upsert:               true,
@@ -190,14 +188,14 @@ func (b *backend) getPolicy(ctx context.Context, stg logical.Storage, config *Co
 		return nil, err
 	}
 
-	if err := b.rotateIfNecessary(ctx, stg, policy, config); err != nil {
+	if err := b.rotateIfNecessary(ctx, stg, policy, config, mount); err != nil {
 		return nil, err
 	}
 
 	return policy, nil
 }
 
-func (b *backend) rotateIfNecessary(ctx context.Context, stg logical.Storage, policy *keysutil.Policy, config *Config) error {
+func (b *backend) rotateIfNecessary(ctx context.Context, stg logical.Storage, policy *keysutil.Policy, config *Config, mount string) error {
 	policy.Lock(true)
 	defer policy.Unlock()
 
@@ -206,7 +204,7 @@ func (b *backend) rotateIfNecessary(ctx context.Context, stg logical.Storage, po
 		return nil
 	}
 
-	if latestKey.CreationTime.Add(config.KeyRotationPeriod).After(b.clock.now()) {
+	if latestKey.CreationTime.Add(config.KeyRotationPeriod).After(time.Now()) {
 		return nil
 	}
 
@@ -217,7 +215,7 @@ func (b *backend) rotateIfNecessary(ctx context.Context, stg logical.Storage, po
 
 	b.lockManager.InvalidatePolicy(policy.Name)
 
-	b.Logger().Info(fmt.Sprintf("Key Rotated: name=%s", policy.Name))
+	b.Logger().Info(fmt.Sprintf("Key Rotated: mount=%s", mount))
 
 	return nil
 }
@@ -254,7 +252,7 @@ func (b *backend) pruneKeyVersions(ctx context.Context, stg logical.Storage, pol
 			)
 		}
 
-		if keyExpiresAt.After(b.clock.now()) {
+		if keyExpiresAt.After(time.Now()) {
 			break
 		}
 	}
@@ -273,21 +271,26 @@ func (b *backend) pruneKeyVersions(ctx context.Context, stg logical.Storage, pol
 		return nil
 	}
 
-	previousMinAvailableVersion := policy.MinDecryptionVersion
-
 	// Ensure that cache doesn't get corrupted in error cases
+	previousMinAvailableVersion := policy.MinAvailableVersion
+	previousMinDecryptionVersion := policy.MinDecryptionVersion
+
 	policy.MinAvailableVersion = unexpiredVersion
+	policy.MinDecryptionVersion = unexpiredVersion
+
 	if err := policy.Persist(ctx, stg); err != nil {
-		policy.MinDecryptionVersion = previousMinAvailableVersion
+		policy.MinAvailableVersion = previousMinAvailableVersion
+		policy.MinDecryptionVersion = previousMinDecryptionVersion
 		return err
 	}
 
 	logger.Info(
 		fmt.Sprintf(
-			"Key Trimmed: mount=%s, latest=%d, min-available=%d",
+			"Key Trimmed: mount=%s, latest=%d, min-available=%d, min-decryption=%d",
 			mount,
-			policy.MinAvailableVersion,
 			policy.LatestVersion,
+			policy.MinAvailableVersion,
+			policy.MinDecryptionVersion,
 		),
 	)
 

@@ -234,7 +234,7 @@ func (b *backend) pathConfigWrite(ctx context.Context, req *logical.Request, d *
 		return logical.ErrorResponse("'%s' is greater that the max lease ttl", keyTokenTTL), logical.ErrInvalidRequest
 	}
 
-	if err := b.saveConfig(ctx, req.Storage, config); err != nil {
+	if err := b.saveConfig(ctx, req.Storage, config, req.MountPoint); err != nil {
 		return nil, err
 	}
 
