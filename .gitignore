@@ -1,3 +1,7 @@
 /vault-plugin-secrets-jwt
 
 dist/
+
+.DS_Store
+.idea
+

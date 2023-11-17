@@ -34,6 +34,10 @@ endif
 functional:
 	@docker build --no-cache -f test/Dockerfile -t vault-jwt-e2e-test .
 
+# stress runs an end-to-end stress test in docker.
+stress:
+	@docker build --no-cache -f test/Stress-Dockerfile -t vault-jwt-e2e-test .
+
 # fmt formats the files according to go recommended style
 fmt:
 	@gofmt -w $(GOFMT_FILES)
